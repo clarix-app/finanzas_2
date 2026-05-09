@@ -1,0 +1,795 @@
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
+import { createClient, User } from '@supabase/supabase-js'
+
+// ── SUPABASE ─────────────────────────────────────────────────────────────────
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL as string,
+  import.meta.env.VITE_SUPABASE_ANON_KEY as string
+)
+
+// ── TYPES ─────────────────────────────────────────────────────────────────────
+type Space = 'personal' | 'empresa'
+type TxType = 'ingreso' | 'egreso'
+interface Tx { id: string; user_id: string; space: Space; date: string; type: TxType; description: string; amount: number; payment_method?: string; client?: string; created_at: string }
+interface Cat { id: string; user_id: string; space: string; type: string; name: string; color: string; is_default: boolean }
+interface PM { id: string; user_id: string; name: string; is_default: boolean }
+interface Gami { user_id: string; xp: number; level: number; streak_days: number }
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
+const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+// ── STYLES ────────────────────────────────────────────────────────────────────
+const C = {
+  bg: '#0d0d14', sbg: '#0f0f18', card: '#12121e', border: '#252535',
+  primary: '#8b7ff0', primaryLight: 'rgba(139,127,240,0.2)',
+  text: '#e8e8f0', muted: '#6060a0', sub: '#5555a0',
+  green: '#4ade80', red: '#f87171', purple: '#a89ef5',
+}
+const btn: React.CSSProperties = { padding: '7px 14px', borderRadius: '9px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit' }
+const inp: React.CSSProperties = { width: '100%', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '7px', padding: '7px 10px', color: C.text, fontSize: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '9px', colorScheme: 'dark' }
+const sel: React.CSSProperties = { ...inp, marginBottom: 0, cursor: 'pointer' }
+const card: React.CSSProperties = { background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }
+const lbl: React.CSSProperties = { display: 'block', fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '5px' }
+
+// ── AUTH CONTEXT ──────────────────────────────────────────────────────────────
+interface AuthCtx {
+  user: User | null; loading: boolean
+  signIn: (e: string, p: string) => Promise<{ error: any }>
+  signUp: (e: string, p: string, n: string) => Promise<{ error: any }>
+  signOut: () => Promise<void>
+}
+const AuthContext = createContext<AuthCtx | undefined>(undefined)
+function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => { setUser(session?.user ?? null); setLoading(false) })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => { setUser(s?.user ?? null); setLoading(false) })
+    return () => subscription.unsubscribe()
+  }, [])
+  return (
+    <AuthContext.Provider value={{
+      user, loading,
+      signIn: (e, p) => supabase.auth.signInWithPassword({ email: e, password: p }).then(r => ({ error: r.error })),
+      signUp: (e, p, n) => supabase.auth.signUp({ email: e, password: p, options: { data: { name: n } } }).then(r => ({ error: r.error })),
+      signOut: () => supabase.auth.signOut().then(() => { })
+    }}>{children}</AuthContext.Provider>
+  )
+}
+function useAuth() {
+  const c = useContext(AuthContext)
+  if (!c) throw new Error('useAuth must be inside AuthProvider')
+  return c
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function LoginPage({ onReg }: { onReg: () => void }) {
+  const { signIn } = useAuth()
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const submit = async () => {
+    if (!email || !pw) return
+    setLoading(true); setErr('')
+    const { error } = await signIn(email, pw)
+    if (error) setErr('Email o contraseña incorrectos')
+    setLoading(false)
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(139,127,240,.4)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+          </div>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
+          <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Inicia sesión para continuar</p>
+        </div>
+        <div style={{ ...card, padding: '28px' }}>
+          {err && <div style={{ background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', borderRadius: '8px', padding: '10px', color: C.red, fontSize: '13px', marginBottom: '16px' }}>{err}</div>}
+          <label style={lbl}>Email</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="tu@email.com" style={inp} />
+          <label style={lbl}>Contraseña</label>
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="••••••••" style={{ ...inp, marginBottom: '20px' }} />
+          <button onClick={submit} disabled={loading} style={{ ...btn, width: '100%', padding: '13px', fontSize: '14px', opacity: loading ? 0.7 : 1 }}>{loading ? 'Iniciando...' : 'Iniciar sesión'}</button>
+        </div>
+        <p style={{ textAlign: 'center', marginTop: '20px', color: C.muted, fontSize: '14px' }}>
+          ¿No tienes cuenta? <button onClick={onReg} style={{ background: 'none', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>Crear cuenta</button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── REGISTER ──────────────────────────────────────────────────────────────────
+function RegisterPage({ onLogin }: { onLogin: () => void }) {
+  const { signUp } = useAuth()
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+  const [ok, setOk] = useState(false)
+
+  if (ok) return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+        <h2 style={{ color: C.text, marginBottom: '10px' }}>¡Cuenta creada!</h2>
+        <p style={{ color: C.muted, marginBottom: '24px' }}>Ya puedes iniciar sesión.</p>
+        <button onClick={onLogin} style={{ ...btn, padding: '12px 28px' }}>Ir al login</button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ width: '100%', maxWidth: '400px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(139,127,240,.4)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+          </div>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
+          <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Crea tu cuenta gratis</p>
+        </div>
+        <div style={{ ...card, padding: '28px' }}>
+          {err && <div style={{ background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', borderRadius: '8px', padding: '10px', color: C.red, fontSize: '13px', marginBottom: '16px' }}>{err}</div>}
+          <label style={lbl}>Nombre</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre" style={inp} />
+          <label style={lbl}>Email</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@email.com" style={inp} />
+          <label style={lbl}>Contraseña</label>
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Mínimo 6 caracteres" style={{ ...inp, marginBottom: '20px' }} />
+          <button onClick={async () => {
+            if (!name || !email || pw.length < 6) { setErr('Completa todos los campos (contraseña mín. 6 caracteres)'); return }
+            setLoading(true); setErr('')
+            const { error } = await signUp(email, pw, name)
+            if (error) setErr(error.message || 'Error al crear cuenta')
+            else setOk(true)
+            setLoading(false)
+          }} disabled={loading} style={{ ...btn, width: '100%', padding: '13px', fontSize: '14px', opacity: loading ? 0.7 : 1 }}>{loading ? 'Creando...' : 'Crear cuenta'}</button>
+        </div>
+        <p style={{ textAlign: 'center', marginTop: '20px', color: C.muted, fontSize: '14px' }}>
+          ¿Ya tienes cuenta? <button onClick={onLogin} style={{ background: 'none', border: 'none', color: C.purple, cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'inherit' }}>Iniciar sesión</button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── MODAL NUEVA TX ────────────────────────────────────────────────────────────
+function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd: (tx: any) => Promise<void>; onClose: () => void }) {
+  const [mode, setMode] = useState<'menu' | 'form'>('menu')
+  const [type, setType] = useState<TxType>('ingreso')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [desc, setDesc] = useState('')
+  const [amount, setAmount] = useState('')
+  const [pm, setPm] = useState(pms[0]?.name || '')
+  const [client, setClient] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [aiFb, setAiFb] = useState('')
+
+  const doAI = (t: 'audio' | 'foto' | 'chat') => {
+    setMode('form')
+    const d = { audio: { a: 800000, d: 'Pago arriendo', t: 'egreso' as TxType, m: '🎙 Escuchando...', r: '✅ "Arriendo 800k" detectado' }, foto: { a: 245000, d: 'Supermercado', t: 'egreso' as TxType, m: '📷 Analizando recibo...', r: '✅ Factura $245.000 detectada' }, chat: { a: 1500000, d: 'Consultoría a cliente', t: 'ingreso' as TxType, m: '💬 Procesando...', r: '✅ "Consultoría $1.5M" detectada' } }[t]
+    setAiFb(d.m)
+    setTimeout(() => { setAiFb(d.r); setAmount(String(d.a)); setDesc(d.d); setType(d.t) }, 1200)
+  }
+
+  const save = async () => {
+    if (!desc || !amount) return
+    setSaving(true)
+    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined })
+    setSaving(false)
+    onClose()
+  }
+
+  const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
+  const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '14px', padding: '20px', width: '375px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif" }
+
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e => e.stopPropagation()}>
+        {mode === 'menu' ? (
+          <>
+            <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '14px', color: C.text }}>¿Cómo quieres registrar?</div>
+            {[{ id: 'manual', ic: '✏️', l: 'Manual', d: 'Llena el formulario' }, { id: 'audio', ic: '🎙', l: 'Audio', d: 'Habla en lenguaje natural' }, { id: 'foto', ic: '📷', l: 'Foto de recibo', d: 'La IA lee el recibo' }, { id: 'chat', ic: '💬', l: 'Chat IA', d: 'Escribe en lenguaje natural' }].map(o => (
+              <div key={o.id} onClick={() => o.id === 'manual' ? setMode('form') : doAI(o.id as any)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid #2a2a3e', background: C.card, marginBottom: '8px' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'rgba(139,127,240,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>{o.ic}</div>
+                <div><div style={{ fontSize: '12px', fontWeight: 600, color: C.text }}>{o.l}</div><div style={{ fontSize: '10px', color: C.muted }}>{o.d}</div></div>
+              </div>
+            ))}
+            <button onClick={onClose} style={{ width: '100%', padding: '9px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '9px', color: C.muted, fontSize: '12px', cursor: 'pointer', marginTop: '4px', fontFamily: 'inherit' }}>Cancelar</button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '14px', color: C.text }}>Nueva transacción</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
+              <div><label style={lbl}>Tipo</label><select value={type} onChange={e => setType(e.target.value as TxType)} style={sel}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></div>
+              <div><label style={lbl}>Fecha</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} /></div>
+            </div>
+            <label style={lbl}>Descripción</label>
+            <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Consultoría..." style={inp} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
+              <div><label style={lbl}>Monto</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, marginBottom: 0 }} /></div>
+              <div><label style={lbl}>Forma de pago</label><select value={pm} onChange={e => setPm(e.target.value)} style={sel}>{pms.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
+            </div>
+            {space === 'empresa' && <><label style={lbl}>Cliente</label><input value={client} onChange={e => setClient(e.target.value)} placeholder="Nombre del cliente..." style={inp} /></>}
+            {aiFb && <div style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '10px', marginBottom: '12px', fontSize: '11px', color: C.purple }}>{aiFb}</div>}
+            <div style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '10px', marginBottom: '12px' }}>
+              <div style={{ fontSize: '10px', color: C.muted, marginBottom: '6px' }}>✨ IA activa</div>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                {(['audio', 'foto', 'chat'] as const).map(t => <button key={t} onClick={() => doAI(t)} style={{ flex: 1, padding: '6px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '7px', fontSize: '11px', cursor: 'pointer', color: '#c0c0e0', fontFamily: 'inherit' }}>{t === 'audio' ? '🎙' : t === 'foto' ? '📷' : '💬'} {t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '7px', justifyContent: 'flex-end' }}>
+              <button onClick={onClose} style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '12px', cursor: 'pointer', border: '1px solid #2a2a3e', background: '#1a1a2e', color: '#c0c0e0', fontFamily: 'inherit' }}>Cancelar</button>
+              <button onClick={save} disabled={saving} style={{ ...btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+function MainApp() {
+  const { user, signOut } = useAuth()
+  const [page, setPage] = useState('dashboard')
+  const [space, setSpace] = useState<Space>('personal')
+  const [month, setMonth] = useState(new Date().getMonth())
+  const [year] = useState(new Date().getFullYear())
+  const [txs, setTxs] = useState<Tx[]>([])
+  const [cats, setCats] = useState<Cat[]>([])
+  const [pms, setPms] = useState<PM[]>([])
+  const [gami, setGami] = useState<Gami | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [adjSub, setAdjSub] = useState('')
+  const [newCat, setNewCat] = useState('')
+  const [newCatType, setNewCatType] = useState('ingreso')
+  const [newPM, setNewPM] = useState('')
+  const [rTab, setRTab] = useState('resumen')
+  const [paretoV, setParetoV] = useState('ingresos')
+  const [movFilter, setMovFilter] = useState('')
+  const [cajaF, setCajaF] = useState('hoy')
+  const [movView, setMovView] = useState('lista')
+
+  useEffect(() => { if (user) loadAll() }, [user, space])
+
+  async function loadAll() {
+    setLoading(true)
+    const [t, c, p, g] = await Promise.all([
+      supabase.from('transactions').select('*').eq('user_id', user!.id).eq('space', space).order('date', { ascending: false }),
+      supabase.from('categories').select('*').eq('user_id', user!.id),
+      supabase.from('payment_methods').select('*').eq('user_id', user!.id),
+      supabase.from('gamification').select('*').eq('user_id', user!.id).single(),
+    ])
+    if (t.data) setTxs(t.data)
+    if (c.data) setCats(c.data)
+    if (p.data) setPms(p.data)
+    if (g.data) setGami(g.data)
+    setLoading(false)
+  }
+
+  async function addTx(tx: any) {
+    const { data, error } = await supabase.from('transactions').insert({ ...tx, user_id: user!.id }).select().single()
+    if (!error && data) {
+      setTxs(prev => [data, ...prev])
+      const xp = (gami?.xp || 0) + 10
+      const lv = Math.floor(xp / 500) + 1
+      await supabase.from('gamification').update({ xp, level: lv, streak_days: (gami?.streak_days || 0) + 1, last_record_date: new Date().toISOString().split('T')[0] }).eq('user_id', user!.id)
+      setGami(prev => prev ? { ...prev, xp, level: lv } : prev)
+    }
+  }
+
+  async function delTx(id: string) {
+    await supabase.from('transactions').delete().eq('id', id)
+    setTxs(prev => prev.filter(t => t.id !== id))
+  }
+
+  async function addCat() {
+    if (!newCat.trim()) return
+    const colors = ['#a89ef5', '#60a5fa', '#fb923c', '#4ade80', '#f87171', '#c084fc', '#fbbf24', '#2dd4bf']
+    const color = colors[Math.floor(Math.random() * colors.length)]
+    const { data } = await supabase.from('categories').insert({ space, type: newCatType, name: newCat.trim(), color, is_default: false, user_id: user!.id }).select().single()
+    if (data) { setCats(prev => [...prev, data]); setNewCat('') }
+  }
+
+  async function delCat(id: string) {
+    await supabase.from('categories').delete().eq('id', id)
+    setCats(prev => prev.filter(c => c.id !== id))
+  }
+
+  async function addPM() {
+    if (!newPM.trim()) return
+    const { data } = await supabase.from('payment_methods').insert({ name: newPM.trim(), user_id: user!.id }).select().single()
+    if (data) { setPms(prev => [...prev, data]); setNewPM('') }
+  }
+
+  async function delPM(id: string) {
+    await supabase.from('payment_methods').delete().eq('id', id)
+    setPms(prev => prev.filter(p => p.id !== id))
+  }
+
+  const txMonth = txs.filter(t => { const d = new Date(t.date); return d.getMonth() === month && d.getFullYear() === year })
+  const spaceCats = cats.filter(c => c.space === space || c.space === 'ambos')
+  const isEmp = space === 'empresa'
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuario'
+  const ing = txMonth.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0)
+  const eg = txMonth.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0)
+  const util = ing - eg
+  const margin = ing > 0 ? Math.round(util / ing * 100) : 0
+  const hour = new Date().getHours()
+  const greet = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches'
+  const xpPct = gami ? ((gami.xp % 500) / 500) * 100 : 0
+
+  const movFiltered = movFilter ? txMonth.filter(t => t.type === movFilter) : txMonth
+  const now = new Date()
+  const cajaMap: Record<string, number> = { hoy: 0, '7d': 7, '15d': 15, '30d': 30 }
+  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - (cajaMap[cajaF] || 0))
+  const cajaTx = cajaF === 'hoy' ? txs.filter(t => t.date === now.toISOString().split('T')[0]) : txs.filter(t => new Date(t.date) >= cutoff)
+  const cajaIng = cajaTx.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0)
+  const cajaEg = cajaTx.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0)
+  const byMethod = (type: string) => { const m: Record<string, number> = {}; cajaTx.filter(t => t.type === type).forEach(t => { const k = t.payment_method || 'Sin método'; m[k] = (m[k] || 0) + t.amount }); return Object.entries(m).sort((a, b) => b[1] - a[1]) }
+  const byMonthData = MONTHS.map((_, m) => { const tx = txs.filter(t => { const d = new Date(t.date); return d.getMonth() === m && d.getFullYear() === year }); const i = tx.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0); const e = tx.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0); return { ing: i, eg: e } })
+  const totIng = byMonthData.reduce((s, m) => s + m.ing, 0); const totEg = byMonthData.reduce((s, m) => s + m.eg, 0); const totUtil = totIng - totEg; const avgMgn = totIng > 0 ? Math.round(totUtil / totIng * 100) : 0
+  const bestM = byMonthData.reduce((b, m, i) => m.ing > (byMonthData[b]?.ing || 0) ? i : b, 0)
+  const maxV = Math.max(...byMonthData.map(m => Math.max(m.ing, m.eg))) || 1
+  const groupBy = (type: string) => { const m: Record<string, number> = {}; txMonth.filter(t => t.type === type).forEach(t => { m[t.description] = (m[t.description] || 0) + t.amount }); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, amount]) => ({ name, amount })) }
+  const rItems = paretoV === 'ingresos' ? groupBy('ingreso') : groupBy('egreso')
+  const rTotal = paretoV === 'ingresos' ? ing : eg
+  const rColor = paretoV === 'ingresos' ? C.purple : C.red
+  const rBarC = paretoV === 'ingresos' ? C.primary : C.red
+  let acum = 0
+  const rCalc = rItems.map((it, i) => { const pct = rTotal > 0 ? Math.round(it.amount / rTotal * 100) : 0; acum += pct; return { ...it, pct, acum, rank: i + 1 } })
+  const cutIdx = rCalc.findIndex(it => it.acum >= 80)
+  const countTop = cutIdx === -1 ? rCalc.length : cutIdx + 1
+  const pctTop = rCalc[Math.max(0, countTop - 1)]?.acum || 0
+  const defBudgets = isEmp ? [{ cat: 'Publicidad', limit: 1000000, color: C.red }, { cat: 'Asistente virtual', limit: 1500000, color: '#c084fc' }, { cat: 'Software', limit: 300000, color: '#38bdf8' }, { cat: 'Transporte', limit: 200000, color: '#818cf8' }] : [{ cat: 'Vivienda', limit: 900000, color: '#60a5fa' }, { cat: 'Alimentación', limit: 300000, color: '#fb923c' }, { cat: 'Transporte', limit: 150000, color: '#c084fc' }, { cat: 'Salud', limit: 200000, color: C.red }, { cat: 'Entretenimiento', limit: 100000, color: '#fbbf24' }]
+
+  const navItems = [
+    { id: 'dashboard', l: 'Inicio', d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+    { id: 'movimientos', l: 'Movimientos', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
+    { id: 'consolidado', l: 'Consolidado', d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+    { id: 'presupuesto', l: 'Presupuesto', d: 'M3 3h18v18H3zM3 9h18M9 21V9' },
+    { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
+  ]
+
+  const sb: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 9px', borderRadius: '9px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, marginBottom: '2px', border: 'none', width: '100%', textAlign: 'left', fontFamily: 'inherit', transition: 'all .15s' }
+  const ph = (title: string, sub: string, extra?: ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>{title}</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{sub}</div></div>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
+        {extra}
+        <button style={btn} onClick={() => setShowModal(true)}>+ Registrar</button>
+      </div>
+    </div>
+  )
+
+  const kpis = (items: { l: string; v: number; c: string }[]) => (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length},1fr)`, gap: '9px', marginBottom: '12px' }}>
+      {items.map((k, i) => (
+        <div key={i} style={{ ...card, padding: '13px 15px' }}>
+          <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{fmt(k.v)}</div>
+          <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{MONTHS[month]} {year}</div>
+        </div>
+      ))}
+    </div>
+  )
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }}>
+
+      {/* ── SIDEBAR ── */}
+      <div style={{ width: '200px', flexShrink: 0, background: C.sbg, borderRight: `1px solid #1e1e2e`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
+        <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid #1e1e2e' }}>
+          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', boxShadow: '0 0 14px rgba(139,127,240,.35)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: '15px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
+          <div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>Planeación financiera</div>
+        </div>
+        <div style={{ margin: '8px 10px 4px', background: '#18182a', borderRadius: '8px', padding: '3px', display: 'flex', border: '1px solid #2a2a3e' }}>
+          {(['personal', 'empresa'] as Space[]).map(s => (
+            <button key={s} onClick={() => setSpace(s)} style={{ flex: 1, padding: '5px 0', textAlign: 'center', borderRadius: '5px', fontSize: '10px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: space === s ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : 'transparent', color: space === s ? '#fff' : '#7070b0' }}>
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }}>
+          {navItems.map(item => (
+            <button key={item.id} onClick={() => setPage(item.id)} style={{ ...sb, background: page === item.id ? C.primaryLight : 'transparent', color: page === item.id ? '#b0a8ff' : '#8888b8' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={item.d} /></svg>
+              {item.l}
+            </button>
+          ))}
+          <div style={{ height: '1px', background: '#1e1e2e', margin: '5px 4px' }} />
+          <button onClick={() => setPage('ajustes')} style={{ ...sb, background: page === 'ajustes' ? C.primaryLight : 'transparent', color: page === 'ajustes' ? '#b0a8ff' : '#8888b8' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+            Ajustes
+          </button>
+        </nav>
+        <div style={{ padding: '10px 12px', borderTop: '1px solid #1e1e2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div><div style={{ fontSize: '11px', fontWeight: 500, color: C.text }}>{userName}</div><div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>{user?.email}</div></div>
+          <button onClick={signOut} title="Cerrar sesión" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>→</button>
+        </div>
+      </div>
+
+      {/* ── MAIN ── */}
+      <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted }}>Cargando datos...</div>
+        ) : (
+          <div style={{ padding: '20px' }}>
+
+            {/* DASHBOARD */}
+            {page === 'dashboard' && <>
+              {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
+              <div style={{ ...card, padding: '16px 18px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '100px', height: '100px', background: 'radial-gradient(circle,rgba(139,127,240,.08),transparent 70%)', pointerEvents: 'none' }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '15px', color: C.text }}>{greet}, {userName} 👋</div>
+                  <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{isEmp ? 'Tu negocio va por buen camino' : 'Tus finanzas están bajo control'}</div>
+                  {gami && <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '7px', fontSize: '11px', color: '#fbbf24' }}><div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fbbf24' }} />{gami.streak_days} días de racha 🔥</div>}
+                </div>
+                {gami && <div style={{ textAlign: 'right', minWidth: '140px' }}>
+                  <div style={{ fontSize: '10px', color: C.muted, marginBottom: '5px' }}>Nivel {gami.level} · {500 - (gami.xp % 500)} XP para nivel {gami.level + 1}</div>
+                  <div style={{ width: '130px', height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden', marginLeft: 'auto' }}><div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#8b7ff0,#6a8af0)', borderRadius: '99px' }} /></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: C.muted, marginTop: '3px', width: '130px', marginLeft: 'auto' }}><span>{gami.xp} XP</span><span>{Math.round(xpPct)}%</span></div>
+                </div>}
+              </div>
+              {kpis([{ l: 'Ingresos', v: ing, c: C.purple }, { l: isEmp ? 'Egresos' : 'Gastos', v: eg, c: C.red }, { l: isEmp ? 'Utilidad' : 'Ahorro', v: util, c: C.green }])}
+              <div style={{ ...card, padding: '14px' }}>
+                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Últimos movimientos</div>
+                {txMonth.length === 0 ? <div style={{ textAlign: 'center', padding: '20px', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes. ¡Registra el primero!</div> :
+                  txMonth.slice(0, 5).map(t => (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)' }}>
+                      <div><div style={{ fontSize: '12px', color: '#c0c0e0' }}>{t.description}</div><div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{t.date} · {t.payment_method || '—'}</div></div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</div>
+                    </div>
+                  ))}
+              </div>
+            </>}
+
+            {/* MOVIMIENTOS */}
+            {page === 'movimientos' && <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Movimientos</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{MONTHS[month]} {year}</div></div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
+                  <select value={movFilter} onChange={e => setMovFilter(e.target.value)} style={{ ...sel, padding: '6px 10px', width: 'auto' }}><option value="">Todos</option><option value="ingreso">Ingresos</option><option value="egreso">Egresos</option></select>
+                  <button style={btn} onClick={() => setShowModal(true)}>+ Registrar</button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+                {['lista', 'caja'].map((v, i) => <button key={v} onClick={() => setMovView(v)} style={{ padding: '6px 13px', borderRadius: '7px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: movView === v ? '1px solid rgba(139,127,240,.3)' : `1px solid ${C.border}`, background: movView === v ? 'rgba(139,127,240,.18)' : '#1a1a2e', color: movView === v ? '#b0a8ff' : '#8888b8' }}>{i === 0 ? 'Movimientos' : 'Caja'}</button>)}
+              </div>
+              {movView === 'lista' ? <>
+                {kpis([{ l: 'Ingresos', v: movFiltered.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0), c: C.purple }, { l: 'Egresos', v: movFiltered.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0), c: C.red }, { l: isEmp ? 'Utilidad' : 'Balance', v: movFiltered.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0) - movFiltered.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0), c: C.green }])}
+                <div style={{ ...card, overflow: 'hidden' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '8px 13px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span>Fecha</span>{isEmp && <span>Cat.</span>}<span>Descripción</span>{isEmp && <span>Cliente</span>}<span style={{ textAlign: 'right' }}>Monto</span>
+                  </div>
+                  {movFiltered.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes</div> :
+                    movFiltered.map(t => (
+                      <div key={t.id} style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center', fontSize: '12px', color: '#c0c0e0', cursor: 'pointer' }} onDoubleClick={() => delTx(t.id)} title="Doble clic para eliminar">
+                        <span style={{ fontSize: '11px', color: C.muted }}>{t.date.slice(5).replace('-', '/')}</span>
+                        {isEmp && <span style={{ fontSize: '11px' }}>{t.description.split(' ').slice(0, 2).join(' ')}</span>}
+                        <span>{t.description}</span>
+                        {isEmp && <span style={{ fontSize: '11px', color: C.muted }}>{t.client || '—'}</span>}
+                        <span style={{ fontWeight: 700, textAlign: 'right', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</span>
+                      </div>
+                    ))}
+                </div>
+                <div style={{ fontSize: '10px', color: C.muted, marginTop: '6px', textAlign: 'center' }}>Doble clic para eliminar</div>
+              </> : <>
+                <div style={{ display: 'flex', gap: '5px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  {['hoy', '7d', '15d', '30d'].map(f => <button key={f} onClick={() => setCajaF(f)} style={{ padding: '5px 11px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: cajaF === f ? 'none' : `1px solid ${C.border}`, background: cajaF === f ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : '#1a1a2e', color: cajaF === f ? 'white' : '#8888b8' }}>{f === 'hoy' ? 'Hoy' : f === '7d' ? '7 días' : f === '15d' ? '15 días' : '30 días'}</button>)}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '12px' }}>
+                  {[{ l: 'Saldo inicial', v: '$0', c: C.text, s: 'Opcional' }, { l: 'Ingresos', v: fmt(cajaIng), c: C.purple }, { l: 'Egresos', v: fmt(cajaEg), c: C.red }, { l: 'Disponible', v: fmt(cajaIng - cajaEg), c: C.green }].map((c, i) => (
+                    <div key={i} style={{ ...card, padding: '11px 13px' }}>
+                      <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{c.l}</div>
+                      <div style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-.03em', marginTop: '4px', color: c.c }}>{c.v}</div>
+                      {c.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{c.s}</div>}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {[{ title: 'Ingresos por método de pago', data: byMethod('ingreso'), color: C.green }, { title: 'Egresos por método de pago', data: byMethod('egreso'), color: C.red }].map((sec, i) => (
+                    <div key={i}>
+                      <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '8px' }}>{sec.title}</div>
+                      <div style={{ ...card, overflow: 'hidden' }}>
+                        {sec.data.length === 0 ? <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: C.muted }}>Sin movimientos</div> :
+                          sec.data.map(([pm, amt]) => (
+                            <div key={pm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.4)' }}>
+                              <span style={{ fontSize: '12px', color: '#c0c0e0' }}>{pm}</span>
+                              <span style={{ fontWeight: 700, fontSize: '13px', color: sec.color }}>{fmt(amt)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>}
+            </>}
+
+            {/* CONSOLIDADO */}
+            {page === 'consolidado' && <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Consolidado</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Vista general {isEmp ? 'empresa' : 'personal'} · {year}</div></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '14px' }}>
+                {[{ l: 'Ingresos acum.', v: fmtM(totIng), c: C.purple }, { l: 'Egresos acum.', v: fmtM(totEg), c: C.red }, { l: isEmp ? 'Utilidad acum.' : 'Ahorro acum.', v: fmtM(totUtil), c: C.green, s: `Margen ${avgMgn}%` }].map((k, i) => (
+                  <div key={i} style={{ ...card, padding: '13px 15px' }}>
+                    <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
+                    <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{k.v}</div>
+                    {k.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{k.s}</div>}
+                  </div>
+                ))}
+              </div>
+              <div style={{ ...card, padding: '14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '12px' }}>Evolución mensual {year}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '90px' }}>
+                  {byMonthData.map((m, i) => (
+                    <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '1px', justifyContent: 'center' }}>
+                      <div style={{ width: '48%', height: `${m.ing / maxV * 80}px`, background: C.primary, borderRadius: '3px 3px 0 0', minHeight: m.ing > 0 ? '4px' : '0' }} />
+                      <div style={{ width: '48%', height: `${m.eg / maxV * 80}px`, background: C.red, borderRadius: '3px 3px 0 0', minHeight: m.eg > 0 ? '4px' : '0' }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>{MONTHS.map((m, i) => <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '8px', color: C.muted }}>{m.slice(0, 1)}</div>)}</div>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+                  {[{ c: C.primary, l: 'Ingresos' }, { c: C.red, l: 'Egresos' }].map(b => <div key={b.l} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: b.c }} /><span style={{ fontSize: '10px', color: C.muted }}>{b.l}</span></div>)}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px' }}>
+                <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>Mejor mes</div><div style={{ fontWeight: 700, fontSize: '18px', color: C.green, margin: '6px 0 2px' }}>{MONTHS[bestM]}</div><div style={{ fontSize: '11px', color: C.muted }}>{fmtM(byMonthData[bestM]?.ing || 0)} ingresos</div></div>
+                <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>Margen promedio</div><div style={{ fontWeight: 700, fontSize: '18px', color: C.purple, margin: '6px 0 2px' }}>{avgMgn}%</div><div style={{ fontSize: '11px', color: C.muted }}>Ene — {MONTHS[new Date().getMonth()]} {year}</div></div>
+              </div>
+            </>}
+
+            {/* PRESUPUESTO */}
+            {page === 'presupuesto' && <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Presupuesto</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Límites por categoría · {MONTHS[month]} {year}</div></div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {defBudgets.map((b, i) => {
+                  const spent = txMonth.filter(t => t.type === 'egreso' && t.description.toLowerCase().includes(b.cat.toLowerCase())).reduce((s, t) => s + t.amount, 0)
+                  const pct = Math.min(100, Math.round(spent / b.limit * 100))
+                  const ov = spent > b.limit
+                  return (
+                    <div key={i} style={{ ...card, padding: '13px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '10px', height: '10px', borderRadius: '50%', background: b.color }} /><span style={{ fontSize: '13px', fontWeight: 500, color: C.text }}>{b.cat}</span></div>
+                        <span style={{ fontSize: '11px', color: ov ? C.red : C.muted }}>{fmt(spent)} / {fmt(b.limit)}</span>
+                      </div>
+                      <div style={{ background: '#1a1a2e', height: '7px', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: ov ? C.red : b.color, borderRadius: '99px' }} /></div>
+                      <div style={{ fontSize: '10px', marginTop: '5px', color: ov ? C.red : C.muted }}>{pct}% utilizado{ov ? ' · ⚠ Límite superado' : ''}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>}
+
+            {/* REPORTES */}
+            {page === 'reportes' && <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Reportes</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{MONTHS[month]} {year}</div></div>
+                <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
+              </div>
+              <div style={{ display: 'flex', gap: '3px', background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '11px', padding: '3px', marginBottom: '16px' }}>
+                {['resumen', 'ingresos', 'gastos', 'pareto'].map(t => <button key={t} onClick={() => setRTab(t)} style={{ flex: 1, padding: '6px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 500, border: rTab === t ? `1px solid ${C.border}` : 'none', background: rTab === t ? C.card : 'transparent', color: rTab === t ? C.text : '#7070b0', fontFamily: 'inherit' }}>{t === 'pareto' ? 'Pareto 80/20' : t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
+              </div>
+
+              {rTab === 'resumen' && <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '12px' }}>
+                  {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Ut. bruta', v: fmtM(ing), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. operacional', v: fmtM(util), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. neta', v: fmtM(util), c: C.green }].map((k, i) => (
+                    <div key={i} style={{ ...card, padding: '11px 13px' }}>
+                      <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
+                      <div style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '-.03em', color: k.c, margin: '4px 0 2px' }}>{k.v}</div>
+                      {k.s && <div style={{ fontSize: '10px', color: C.green }}>{k.s}</div>}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px' }}>
+                  <div style={{ ...card, padding: '14px' }}>
+                    <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Ingresos vs Egresos</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '80px' }}>
+                      {[{ v: ing, c: C.primary, l: 'Ing' }, { v: eg, c: C.red, l: 'Eg' }, { v: Math.max(0, util), c: C.green, l: 'Neto' }].map((b, i) => { const max = Math.max(ing, eg, util) || 1; return <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}><div style={{ fontSize: '9px', color: C.muted }}>{fmtM(b.v)}</div><div style={{ width: '100%', height: `${b.v / max * 60}px`, background: b.c, borderRadius: '3px 3px 0 0', minHeight: '4px' }} /><div style={{ fontSize: '8px', color: C.muted }}>{b.l}</div></div> })}
+                    </div>
+                  </div>
+                  <div style={{ ...card, padding: '14px' }}>
+                    <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Margen neto</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80px', gap: '14px' }}>
+                      <svg width="60" height="60" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}><circle cx="18" cy="18" r="14" fill="none" stroke="#1a1a2e" strokeWidth="3.5" /><circle cx="18" cy="18" r="14" fill="none" stroke={C.primary} strokeWidth="3.5" strokeDasharray={`${margin} 100`} strokeLinecap="round" /></svg>
+                      <div style={{ fontSize: '22px', fontWeight: 700, color: C.purple }}>{margin}%</div>
+                    </div>
+                  </div>
+                </div>
+              </>}
+
+              {(rTab === 'ingresos' || rTab === 'gastos') && (() => {
+                const items = rTab === 'ingresos' ? groupBy('ingreso') : groupBy('egreso')
+                const total = rTab === 'ingresos' ? ing : eg
+                const color = rTab === 'ingresos' ? C.purple : C.red
+                return <>
+                  <div style={{ fontWeight: 700, fontSize: '22px', letterSpacing: '-.04em', marginBottom: '14px', color }}>{fmt(total)}</div>
+                  <div style={{ ...card, padding: '14px' }}>
+                    {items.length === 0 ? <div style={{ textAlign: 'center', color: C.muted, fontSize: '12px', padding: '20px' }}>No hay datos este mes</div> :
+                      items.map((it, i) => { const pct = total > 0 ? Math.round(it.amount / total * 100) : 0; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '9px' }}><span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0' }}>{it.name}</span><div style={{ flex: 1.5, height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div><span style={{ fontSize: '10px', color: C.muted, minWidth: '26px', textAlign: 'right' }}>{pct}%</span><span style={{ fontWeight: 700, fontSize: '11px', color, minWidth: '80px', textAlign: 'right' }}>{fmt(it.amount)}</span></div> })}
+                  </div>
+                </>
+              })()}
+
+              {rTab === 'pareto' && <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '14px' }}>
+                  {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Egresos', v: fmtM(eg), c: C.red }, { l: 'Neto', v: fmtM(util), c: C.green, s: `Margen ${margin}%` }].map((k, i) => <div key={i} style={{ ...card, padding: '12px 14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div><div style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-.04em', marginTop: '4px', color: k.c }}>{k.v}</div>{k.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{k.s}</div>}</div>)}
+                </div>
+                <div style={{ display: 'flex', gap: '5px', marginBottom: '14px' }}>
+                  {[{ v: 'ingresos', l: '📈 ¿De dónde entra más?' }, { v: 'egresos', l: '📉 ¿A dónde se va más?' }].map(b => <button key={b.v} onClick={() => setParetoV(b.v)} style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: paretoV === b.v ? (b.v === 'ingresos' ? '1px solid rgba(139,127,240,.35)' : '1px solid rgba(248,113,113,.3)') : `1px solid ${C.border}`, background: paretoV === b.v ? (b.v === 'ingresos' ? 'rgba(139,127,240,.15)' : 'rgba(248,113,113,.1)') : '#1a1a2e', color: paretoV === b.v ? (b.v === 'ingresos' ? C.purple : C.red) : '#8888b8' }}>{b.l}</button>)}
+                </div>
+                <div style={{ ...card, padding: '18px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '15px', color: C.text }}>Análisis Pareto 80/20</div>
+                      <div style={{ fontSize: '12px', color: C.muted, marginTop: '4px' }}><span style={{ color: C.text, fontWeight: 600 }}>{countTop}</span> de {rItems.length} fuentes generan el <span style={{ color: rColor, fontSize: '15px', fontWeight: 700 }}>{pctTop}%</span> de tus {paretoV === 'ingresos' ? 'ingresos' : 'egresos'}</div>
+                    </div>
+                    <div style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, background: paretoV === 'ingresos' ? 'rgba(139,127,240,.15)' : 'rgba(248,113,113,.12)', color: rColor, border: `1px solid ${paretoV === 'ingresos' ? 'rgba(139,127,240,.3)' : 'rgba(248,113,113,.25)'}` }}>{paretoV === 'ingresos' ? 'INGRESOS' : 'EGRESOS'}</div>
+                  </div>
+                  {rCalc.length === 0 ? <div style={{ textAlign: 'center', color: C.muted, fontSize: '12px', padding: '20px' }}>No hay datos este mes</div> :
+                    rCalc.map((it, i) => {
+                      const isTop = i < countTop
+                      const bw = rItems[0]?.amount > 0 ? Math.round(it.amount / rItems[0].amount * 100) : 0
+                      return (
+                        <div key={i}>
+                          {i === countTop && <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0 10px' }}><div style={{ flex: 1, height: '1px', background: 'rgba(139,127,240,.25)' }} /><div style={{ fontSize: '10px', color: C.primary, fontWeight: 600, whiteSpace: 'nowrap' }}>─── 80% alcanzado</div><div style={{ flex: 1, height: '1px', background: 'rgba(139,127,240,.25)' }} /></div>}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '6px 8px', borderRadius: '8px', opacity: isTop ? 1 : 0.45 }}>
+                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, flexShrink: 0, background: isTop ? rBarC : '#1a1a2e', color: isTop ? 'white' : C.muted }}>{it.rank}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 500, flex: 1, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
+                            <div style={{ flex: 1.8, height: '6px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${bw}%`, background: isTop ? rBarC : '#2a2a3e', borderRadius: '99px' }} /></div>
+                            <div style={{ fontSize: '10px', color: C.muted, minWidth: '26px', textAlign: 'right' }}>{it.pct}%</div>
+                            <div style={{ fontWeight: 700, fontSize: '12px', minWidth: '84px', textAlign: 'right', color: isTop ? rColor : C.muted }}>{fmt(it.amount)}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  <div style={{ marginTop: '12px', padding: '10px 12px', background: '#0f0f1a', borderRadius: '8px', border: '1px solid #1e1e2e', fontSize: '10px', color: C.sub, lineHeight: 1.6 }}>
+                    <strong style={{ color: C.primary }}>Principio de Pareto:</strong> El ~20% de tus fuentes concentran el ~80% del total.
+                  </div>
+                </div>
+              </>}
+            </>}
+
+            {/* AJUSTES */}
+            {page === 'ajustes' && <>
+              {!adjSub ? <>
+                <div style={{ marginBottom: '16px' }}><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Ajustes</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Personaliza tu experiencia</div></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[{ id: 'perfil', l: 'Perfil', d: 'Nombre y configuración' }, { id: 'categorias', l: 'Categorías', d: 'Ingresos, costos y gastos' }, { id: 'pagos', l: 'Métodos de pago', d: 'Cómo recibes pagos' }, { id: 'whatsapp', l: 'WhatsApp', d: 'Conecta para reportes' }].map(item => (
+                    <div key={item.id} onClick={() => setAdjSub(item.id)} style={{ ...card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                      <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="2">
+                          {item.id === 'perfil' && <><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></>}
+                          {item.id === 'categorias' && <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />}
+                          {item.id === 'pagos' && <><rect x="1" y="4" width="22" height="16" rx="2" /><path d="M1 10h22" /></>}
+                          {item.id === 'whatsapp' && <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />}
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: 500, color: C.text }}>{item.l}</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '1px' }}>{item.d}</div></div>
+                      <div style={{ color: C.muted, fontSize: '16px' }}>›</div>
+                    </div>
+                  ))}
+                </div>
+              </> : <>
+                <button onClick={() => setAdjSub('')} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px', fontSize: '12px', color: C.muted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>Ajustes
+                </button>
+                {adjSub === 'perfil' && <>
+                  <div style={{ fontWeight: 700, fontSize: '17px', color: C.text, marginBottom: '14px' }}>Perfil</div>
+                  <div style={{ ...card, padding: '16px' }}>
+                    <label style={lbl}>Email</label>
+                    <div style={{ background: '#0f0f1a', border: `1px solid ${C.border}`, borderRadius: '7px', padding: '7px 10px', color: C.muted, fontSize: '12px', marginBottom: '9px' }}>{user?.email}</div>
+                    <label style={lbl}>Moneda</label>
+                    <select style={sel}><option>COP — Peso colombiano</option><option>USD — Dólar</option><option>CLP — Peso chileno</option></select>
+                  </div>
+                </>}
+                {adjSub === 'categorias' && <>
+                  <div style={{ fontWeight: 700, fontSize: '17px', color: C.text, marginBottom: '14px' }}>Categorías</div>
+                  <div style={{ ...card, padding: '14px' }}>
+                    <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                      {spaceCats.map(c => (
+                        <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '6px 0', borderBottom: '1px solid rgba(37,37,53,.5)' }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+                          <span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0' }}>{c.name}</span>
+                          <span style={{ fontSize: '9px', color: C.muted, background: '#1a1a2e', padding: '2px 6px', borderRadius: '99px' }}>{c.type}</span>
+                          {!c.is_default && <button onClick={() => delCat(c.id)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px' }}>×</button>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                      <input value={newCat} onChange={e => setNewCat(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCat()} placeholder="Nueva categoría..." style={{ flex: 1, background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '7px', padding: '6px 9px', color: C.text, fontSize: '11px', outline: 'none', fontFamily: 'inherit' }} />
+                      <select value={newCatType} onChange={e => setNewCatType(e.target.value)} style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, color: C.text, borderRadius: '7px', padding: '5px 7px', fontSize: '10px', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option><option value="costo">Costo</option><option value="gasto">Gasto</option></select>
+                      <button onClick={addCat} style={{ padding: '6px 11px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>+</button>
+                    </div>
+                  </div>
+                </>}
+                {adjSub === 'pagos' && <>
+                  <div style={{ fontWeight: 700, fontSize: '17px', color: C.text, marginBottom: '14px' }}>Métodos de pago</div>
+                  <div style={{ ...card, padding: '14px' }}>
+                    <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                      {pms.map(pm => (
+                        <div key={pm.id} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 0', borderBottom: '1px solid rgba(37,37,53,.5)' }}>
+                          <span style={{ fontSize: '13px', width: '18px', textAlign: 'center' }}>{pm.name === 'Efectivo' ? '💵' : pm.name === 'Transferencia' ? '💳' : pm.name === 'Nequi' ? '🟢' : pm.name === 'Daviplata' ? '🔵' : '💰'}</span>
+                          <span style={{ fontSize: '12px', flex: 1, color: '#c0c0e0' }}>{pm.name}</span>
+                          {!pm.is_default && <button onClick={() => delPM(pm.id)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px' }}>×</button>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
+                      <input value={newPM} onChange={e => setNewPM(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPM()} placeholder="Nueva forma de pago..." style={{ flex: 1, background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '7px', padding: '6px 9px', color: C.text, fontSize: '11px', outline: 'none', fontFamily: 'inherit' }} />
+                      <button onClick={addPM} style={{ padding: '6px 11px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: 'white', border: 'none', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>+</button>
+                    </div>
+                  </div>
+                </>}
+                {adjSub === 'whatsapp' && <>
+                  <div style={{ fontWeight: 700, fontSize: '17px', color: C.text, marginBottom: '14px' }}>WhatsApp</div>
+                  <div style={{ ...card, padding: '16px' }}>
+                    <label style={lbl}>Número</label>
+                    <input placeholder="+57 300 000 0000" style={inp} />
+                    <div style={{ fontSize: '11px', color: C.muted, marginBottom: '12px' }}>Conecta para consultas y reportes automáticos</div>
+                    <button style={{ ...btn, width: '100%' }}>Conectar WhatsApp</button>
+                  </div>
+                </>}
+              </>}
+            </>}
+
+          </div>
+        )}
+      </div>
+
+      {showModal && <Modal pms={pms} space={space} onAdd={addTx} onClose={() => setShowModal(false)} />}
+    </div>
+  )
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoot />
+    </AuthProvider>
+  )
+}
+
+function AppRoot() {
+  const { user, loading } = useAuth()
+  const [view, setView] = useState<'login' | 'register'>('login')
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+        </div>
+        <div style={{ color: '#6060a0', fontSize: '13px' }}>Cargando Clarix...</div>
+      </div>
+    </div>
+  )
+
+  if (!user) return view === 'register'
+    ? <RegisterPage onLogin={() => setView('login')} />
+    : <LoginPage onReg={() => setView('register')} />
+
+  return <MainApp />
+}
