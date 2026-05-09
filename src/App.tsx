@@ -1,13 +1,11 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
 import { createClient, User } from '@supabase/supabase-js'
 
-// ── SUPABASE ─────────────────────────────────────────────────────────────────
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
   import.meta.env.VITE_SUPABASE_ANON_KEY as string
 )
 
-// ── TYPES ─────────────────────────────────────────────────────────────────────
 type Space = 'personal' | 'empresa'
 type TxType = 'ingreso' | 'egreso'
 interface Tx { id: string; user_id: string; space: Space; date: string; type: TxType; description: string; amount: number; payment_method?: string; client?: string; created_at: string }
@@ -15,12 +13,10 @@ interface Cat { id: string; user_id: string; space: string; type: string; name: 
 interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
 const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
 const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-// ── STYLES ────────────────────────────────────────────────────────────────────
 const C = {
   bg: '#0d0d14', sbg: '#0f0f18', card: '#12121e', border: '#252535',
   primary: '#8b7ff0', primaryLight: 'rgba(139,127,240,0.2)',
@@ -33,7 +29,6 @@ const sel: React.CSSProperties = { ...inp, marginBottom: 0, cursor: 'pointer' }
 const card: React.CSSProperties = { background: C.card, borderRadius: '12px', border: `1px solid ${C.border}` }
 const lbl: React.CSSProperties = { display: 'block', fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '5px' }
 
-// ── AUTH CONTEXT ──────────────────────────────────────────────────────────────
 interface AuthCtx {
   user: User | null; loading: boolean
   signIn: (e: string, p: string) => Promise<{ error: any }>
@@ -64,14 +59,12 @@ function useAuth() {
   return c
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
 function LoginPage({ onReg }: { onReg: () => void }) {
   const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
-
   const submit = async () => {
     if (!email || !pw) return
     setLoading(true); setErr('')
@@ -79,7 +72,6 @@ function LoginPage({ onReg }: { onReg: () => void }) {
     if (error) setErr('Email o contraseña incorrectos')
     setLoading(false)
   }
-
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
@@ -106,7 +98,6 @@ function LoginPage({ onReg }: { onReg: () => void }) {
   )
 }
 
-// ── REGISTER ──────────────────────────────────────────────────────────────────
 function RegisterPage({ onLogin }: { onLogin: () => void }) {
   const { signUp } = useAuth()
   const [name, setName] = useState('')
@@ -115,7 +106,6 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState(false)
-
   if (ok) return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center', padding: '20px' }}>
@@ -126,7 +116,6 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
       </div>
     </div>
   )
-
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
@@ -162,7 +151,6 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
   )
 }
 
-// ── MODAL NUEVA TX ────────────────────────────────────────────────────────────
 function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd: (tx: any) => Promise<void>; onClose: () => void }) {
   const [mode, setMode] = useState<'menu' | 'form'>('menu')
   const [type, setType] = useState<TxType>('ingreso')
@@ -173,14 +161,12 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
   const [client, setClient] = useState('')
   const [saving, setSaving] = useState(false)
   const [aiFb, setAiFb] = useState('')
-
   const doAI = (t: 'audio' | 'foto' | 'chat') => {
     setMode('form')
     const d = { audio: { a: 800000, d: 'Pago arriendo', t: 'egreso' as TxType, m: '🎙 Escuchando...', r: '✅ "Arriendo 800k" detectado' }, foto: { a: 245000, d: 'Supermercado', t: 'egreso' as TxType, m: '📷 Analizando recibo...', r: '✅ Factura $245.000 detectada' }, chat: { a: 1500000, d: 'Consultoría a cliente', t: 'ingreso' as TxType, m: '💬 Procesando...', r: '✅ "Consultoría $1.5M" detectada' } }[t]
     setAiFb(d.m)
     setTimeout(() => { setAiFb(d.r); setAmount(String(d.a)); setDesc(d.d); setType(d.t) }, 1200)
   }
-
   const save = async () => {
     if (!desc || !amount) return
     setSaving(true)
@@ -188,10 +174,8 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
     setSaving(false)
     onClose()
   }
-
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
   const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '14px', padding: '20px', width: '375px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif" }
-
   return (
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={e => e.stopPropagation()}>
@@ -238,7 +222,59 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
   )
 }
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
+// ── EDIT MODAL ────────────────────────────────────────────────────────────────
+function EditModal({ tx, pms, space, onSave, onDelete, onClose }: { tx: Tx; pms: PM[]; space: Space; onSave: (data: any) => Promise<void>; onDelete: () => Promise<void>; onClose: () => void }) {
+  const [type, setType] = useState<TxType>(tx.type)
+  const [date, setDate] = useState(tx.date)
+  const [desc, setDesc] = useState(tx.description)
+  const [amount, setAmount] = useState(String(tx.amount))
+  const [pm, setPm] = useState(tx.payment_method || pms[0]?.name || '')
+  const [client, setClient] = useState(tx.client || '')
+  const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
+  const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '14px', padding: '20px', width: '375px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif" }
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e => e.stopPropagation()}>
+        <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px', color: C.text }}>Editar transacción</div>
+        <div style={{ fontSize: '11px', color: C.muted, marginBottom: '14px' }}>{tx.date} · {tx.description}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
+          <div><label style={lbl}>Tipo</label><select value={type} onChange={e => setType(e.target.value as TxType)} style={sel}><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></div>
+          <div><label style={lbl}>Fecha</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} /></div>
+        </div>
+        <label style={lbl}>Descripción</label>
+        <input value={desc} onChange={e => setDesc(e.target.value)} style={inp} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
+          <div><label style={lbl}>Monto</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inp, marginBottom: 0 }} /></div>
+          <div><label style={lbl}>Forma de pago</label><select value={pm} onChange={e => setPm(e.target.value)} style={sel}>{pms.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
+        </div>
+        {space === 'empresa' && <><label style={lbl}>Cliente</label><input value={client} onChange={e => setClient(e.target.value)} placeholder="Nombre del cliente..." style={inp} /></>}
+        <div style={{ display: 'flex', gap: '7px', marginTop: '4px', justifyContent: 'space-between' }}>
+          {!confirming ? (
+            <button onClick={() => setConfirming(true)} style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '12px', cursor: 'pointer', border: '1px solid rgba(248,113,113,.3)', background: 'rgba(248,113,113,.1)', color: C.red, fontFamily: 'inherit' }}>🗑 Eliminar</button>
+          ) : (
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: C.red }}>¿Confirmar?</span>
+              <button onClick={onDelete} style={{ padding: '5px 10px', borderRadius: '7px', fontSize: '11px', cursor: 'pointer', border: 'none', background: C.red, color: 'white', fontFamily: 'inherit' }}>Sí</button>
+              <button onClick={() => setConfirming(false)} style={{ padding: '5px 10px', borderRadius: '7px', fontSize: '11px', cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted, fontFamily: 'inherit' }}>No</button>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '7px' }}>
+            <button onClick={onClose} style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '12px', cursor: 'pointer', border: '1px solid #2a2a3e', background: '#1a1a2e', color: '#c0c0e0', fontFamily: 'inherit' }}>Cancelar</button>
+            <button onClick={async () => {
+              if (!desc || !amount) return
+              setSaving(true)
+              await onSave({ type, date, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined })
+              setSaving(false)
+            }} disabled={saving} style={{ ...btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Guardando...' : 'Guardar'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MainApp() {
   const { user, signOut } = useAuth()
   const [page, setPage] = useState('dashboard')
@@ -251,6 +287,7 @@ function MainApp() {
   const [gami, setGami] = useState<Gami | null>(null)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editTx, setEditTx] = useState<Tx | null>(null)
   const [adjSub, setAdjSub] = useState('')
   const [newCat, setNewCat] = useState('')
   const [newCatType, setNewCatType] = useState('ingreso')
@@ -287,6 +324,11 @@ function MainApp() {
       await supabase.from('gamification').update({ xp, level: lv, streak_days: (gami?.streak_days || 0) + 1, last_record_date: new Date().toISOString().split('T')[0] }).eq('user_id', user!.id)
       setGami(prev => prev ? { ...prev, xp, level: lv } : prev)
     }
+  }
+
+  async function updateTx(id: string, data: any) {
+    const { data: updated } = await supabase.from('transactions').update(data).eq('id', id).select().single()
+    if (updated) setTxs(prev => prev.map(t => t.id === id ? updated : t))
   }
 
   async function delTx(id: string) {
@@ -329,7 +371,6 @@ function MainApp() {
   const hour = new Date().getHours()
   const greet = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches'
   const xpPct = gami ? ((gami.xp % 500) / 500) * 100 : 0
-
   const movFiltered = movFilter ? txMonth.filter(t => t.type === movFilter) : txMonth
   const now = new Date()
   const cajaMap: Record<string, number> = { hoy: 0, '7d': 7, '15d': 15, '30d': 30 }
@@ -353,7 +394,6 @@ function MainApp() {
   const countTop = cutIdx === -1 ? rCalc.length : cutIdx + 1
   const pctTop = rCalc[Math.max(0, countTop - 1)]?.acum || 0
   const defBudgets = isEmp ? [{ cat: 'Publicidad', limit: 1000000, color: C.red }, { cat: 'Asistente virtual', limit: 1500000, color: '#c084fc' }, { cat: 'Software', limit: 300000, color: '#38bdf8' }, { cat: 'Transporte', limit: 200000, color: '#818cf8' }] : [{ cat: 'Vivienda', limit: 900000, color: '#60a5fa' }, { cat: 'Alimentación', limit: 300000, color: '#fb923c' }, { cat: 'Transporte', limit: 150000, color: '#c084fc' }, { cat: 'Salud', limit: 200000, color: C.red }, { cat: 'Entretenimiento', limit: 100000, color: '#fbbf24' }]
-
   const navItems = [
     { id: 'dashboard', l: 'Inicio', d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
     { id: 'movimientos', l: 'Movimientos', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
@@ -361,7 +401,6 @@ function MainApp() {
     { id: 'presupuesto', l: 'Presupuesto', d: 'M3 3h18v18H3zM3 9h18M9 21V9' },
     { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
   ]
-
   const sb: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 9px', borderRadius: '9px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, marginBottom: '2px', border: 'none', width: '100%', textAlign: 'left', fontFamily: 'inherit', transition: 'all .15s' }
   const ph = (title: string, sub: string, extra?: ReactNode) => (
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -373,7 +412,6 @@ function MainApp() {
       </div>
     </div>
   )
-
   const kpis = (items: { l: string; v: number; c: string }[]) => (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length},1fr)`, gap: '9px', marginBottom: '12px' }}>
       {items.map((k, i) => (
@@ -388,8 +426,6 @@ function MainApp() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }}>
-
-      {/* ── SIDEBAR ── */}
       <div style={{ width: '200px', flexShrink: 0, background: C.sbg, borderRight: `1px solid #1e1e2e`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid #1e1e2e' }}>
           <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', boxShadow: '0 0 14px rgba(139,127,240,.35)' }}>
@@ -424,14 +460,11 @@ function MainApp() {
         </div>
       </div>
 
-      {/* ── MAIN ── */}
       <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted }}>Cargando datos...</div>
         ) : (
           <div style={{ padding: '20px' }}>
-
-            {/* DASHBOARD */}
             {page === 'dashboard' && <>
               {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
               <div style={{ ...card, padding: '16px 18px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
@@ -452,7 +485,7 @@ function MainApp() {
                 <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Últimos movimientos</div>
                 {txMonth.length === 0 ? <div style={{ textAlign: 'center', padding: '20px', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes. ¡Registra el primero!</div> :
                   txMonth.slice(0, 5).map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)' }}>
+                    <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)', cursor: 'pointer' }}>
                       <div><div style={{ fontSize: '12px', color: '#c0c0e0' }}>{t.description}</div><div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{t.date} · {t.payment_method || '—'}</div></div>
                       <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</div>
                     </div>
@@ -460,7 +493,6 @@ function MainApp() {
               </div>
             </>}
 
-            {/* MOVIMIENTOS */}
             {page === 'movimientos' && <>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Movimientos</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{MONTHS[month]} {year}</div></div>
@@ -481,7 +513,7 @@ function MainApp() {
                   </div>
                   {movFiltered.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes</div> :
                     movFiltered.map(t => (
-                      <div key={t.id} style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center', fontSize: '12px', color: '#c0c0e0', cursor: 'pointer' }} onDoubleClick={() => delTx(t.id)} title="Doble clic para eliminar">
+                      <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center', fontSize: '12px', color: '#c0c0e0', cursor: 'pointer' }} title="Clic para editar">
                         <span style={{ fontSize: '11px', color: C.muted }}>{t.date.slice(5).replace('-', '/')}</span>
                         {isEmp && <span style={{ fontSize: '11px' }}>{t.description.split(' ').slice(0, 2).join(' ')}</span>}
                         <span>{t.description}</span>
@@ -490,7 +522,7 @@ function MainApp() {
                       </div>
                     ))}
                 </div>
-                <div style={{ fontSize: '10px', color: C.muted, marginTop: '6px', textAlign: 'center' }}>Doble clic para eliminar</div>
+                <div style={{ fontSize: '10px', color: C.muted, marginTop: '6px', textAlign: 'center' }}>Clic en una fila para editar o eliminar</div>
               </> : <>
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '12px', flexWrap: 'wrap' }}>
                   {['hoy', '7d', '15d', '30d'].map(f => <button key={f} onClick={() => setCajaF(f)} style={{ padding: '5px 11px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: cajaF === f ? 'none' : `1px solid ${C.border}`, background: cajaF === f ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : '#1a1a2e', color: cajaF === f ? 'white' : '#8888b8' }}>{f === 'hoy' ? 'Hoy' : f === '7d' ? '7 días' : f === '15d' ? '15 días' : '30 días'}</button>)}
@@ -523,7 +555,6 @@ function MainApp() {
               </>}
             </>}
 
-            {/* CONSOLIDADO */}
             {page === 'consolidado' && <>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Consolidado</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Vista general {isEmp ? 'empresa' : 'personal'} · {year}</div></div>
@@ -558,7 +589,6 @@ function MainApp() {
               </div>
             </>}
 
-            {/* PRESUPUESTO */}
             {page === 'presupuesto' && <>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Presupuesto</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Límites por categoría · {MONTHS[month]} {year}</div></div>
@@ -582,7 +612,6 @@ function MainApp() {
               </div>
             </>}
 
-            {/* REPORTES */}
             {page === 'reportes' && <>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Reportes</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{MONTHS[month]} {year}</div></div>
@@ -591,7 +620,6 @@ function MainApp() {
               <div style={{ display: 'flex', gap: '3px', background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '11px', padding: '3px', marginBottom: '16px' }}>
                 {['resumen', 'ingresos', 'gastos', 'pareto'].map(t => <button key={t} onClick={() => setRTab(t)} style={{ flex: 1, padding: '6px', textAlign: 'center', borderRadius: '8px', cursor: 'pointer', fontSize: '11px', fontWeight: 500, border: rTab === t ? `1px solid ${C.border}` : 'none', background: rTab === t ? C.card : 'transparent', color: rTab === t ? C.text : '#7070b0', fontFamily: 'inherit' }}>{t === 'pareto' ? 'Pareto 80/20' : t.charAt(0).toUpperCase() + t.slice(1)}</button>)}
               </div>
-
               {rTab === 'resumen' && <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '12px' }}>
                   {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Ut. bruta', v: fmtM(ing), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. operacional', v: fmtM(util), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. neta', v: fmtM(util), c: C.green }].map((k, i) => (
@@ -618,7 +646,6 @@ function MainApp() {
                   </div>
                 </div>
               </>}
-
               {(rTab === 'ingresos' || rTab === 'gastos') && (() => {
                 const items = rTab === 'ingresos' ? groupBy('ingreso') : groupBy('egreso')
                 const total = rTab === 'ingresos' ? ing : eg
@@ -631,7 +658,6 @@ function MainApp() {
                   </div>
                 </>
               })()}
-
               {rTab === 'pareto' && <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '14px' }}>
                   {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Egresos', v: fmtM(eg), c: C.red }, { l: 'Neto', v: fmtM(util), c: C.green, s: `Margen ${margin}%` }].map((k, i) => <div key={i} style={{ ...card, padding: '12px 14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div><div style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-.04em', marginTop: '4px', color: k.c }}>{k.v}</div>{k.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{k.s}</div>}</div>)}
@@ -671,7 +697,6 @@ function MainApp() {
               </>}
             </>}
 
-            {/* AJUSTES */}
             {page === 'ajustes' && <>
               {!adjSub ? <>
                 <div style={{ marginBottom: '16px' }}><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Ajustes</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Personaliza tu experiencia</div></div>
@@ -753,17 +778,25 @@ function MainApp() {
                 </>}
               </>}
             </>}
-
           </div>
         )}
       </div>
 
       {showModal && <Modal pms={pms} space={space} onAdd={addTx} onClose={() => setShowModal(false)} />}
+      {editTx && (
+        <EditModal
+          tx={editTx}
+          pms={pms}
+          space={space}
+          onSave={async (data) => { await updateTx(editTx.id, data); setEditTx(null) }}
+          onDelete={async () => { await delTx(editTx.id); setEditTx(null) }}
+          onClose={() => setEditTx(null)}
+        />
+      )}
     </div>
   )
 }
 
-// ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <AuthProvider>
@@ -775,7 +808,6 @@ export default function App() {
 function AppRoot() {
   const { user, loading } = useAuth()
   const [view, setView] = useState<'login' | 'register'>('login')
-
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center' }}>
@@ -786,10 +818,8 @@ function AppRoot() {
       </div>
     </div>
   )
-
   if (!user) return view === 'register'
     ? <RegisterPage onLogin={() => setView('login')} />
     : <LoginPage onReg={() => setView('register')} />
-
   return <MainApp />
 }
