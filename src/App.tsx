@@ -365,6 +365,39 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
   )
 }
 
+function BudgetCustomRow({ onSave }: { onSave: (name: string, amt: number) => void }) {
+  const [name, setName] = useState('')
+  const [val, setVal] = useState('')
+  const [saving, setSaving] = useState(false)
+  return (
+    <div style={{ background: '#12121e', borderRadius: '12px', border: '1px solid #252535', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <input
+        type="text"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="Nombre categoría..."
+        style={{ flex: 1, minWidth: '120px', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '7px', padding: '5px 8px', color: '#e8e8f0', fontSize: '11px', outline: 'none', fontFamily: 'inherit' }}
+      />
+      <input
+        type="number"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        placeholder="Límite mensual"
+        style={{ width: '130px', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '7px', padding: '5px 8px', color: '#e8e8f0', fontSize: '11px', outline: 'none', fontFamily: 'inherit' }}
+      />
+      <button onClick={async () => {
+        if (!name.trim() || !val || Number(val) <= 0) return
+        setSaving(true)
+        await onSave(name.trim(), Number(val))
+        setName(''); setVal('')
+        setSaving(false)
+      }} disabled={saving} style={{ padding: '5px 12px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+        {saving ? '...' : '+ Agregar'}
+      </button>
+    </div>
+  )
+}
+
 function BudgetRow({ cat, onSave }: { cat: any; onSave: (amt: number) => void }) {
   const [val, setVal] = useState('')
   const [saving, setSaving] = useState(false)
@@ -823,6 +856,10 @@ function MainApp() {
                     {withoutBudget.map((c, i) => (
                       <BudgetRow key={i} cat={c} onSave={(amt) => upsertBudget(c.name, amt)} />
                     ))}
+                  </div>
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '8px' }}>O agrega una categoría personalizada</div>
+                    <BudgetCustomRow onSave={(name, amt) => upsertBudget(name, amt)} />
                   </div>
                 </div>
               </>
