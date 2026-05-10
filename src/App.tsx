@@ -151,7 +151,29 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
   )
 }
 
-function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd: (tx: any) => Promise<void>; onClose: () => void }) {
+async function geminiSuggestCategory(desc: string, cats: Cat[]): Promise<string | null> {
+  try {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+    if (!apiKey || !desc.trim() || cats.length === 0) return null
+    const catNames = cats.map(c => c.name).join(', ')
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Eres un asistente de categorización financiera. Dado el siguiente movimiento financiero, sugiere la categoría más apropiada de la lista disponible. Responde SOLO con el nombre exacto de la categoría, sin explicación ni puntuación adicional.\n\nMovimiento: "${desc}"\nCategorías disponibles: ${catNames}\n\nCategoría sugerida:` }] }],
+        generationConfig: { maxOutputTokens: 20, temperature: 0.1 }
+      })
+    })
+    const data = await res.json()
+    const suggested = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+    if (suggested && cats.find(c => c.name.toLowerCase() === suggested.toLowerCase())) {
+      return cats.find(c => c.name.toLowerCase() === suggested.toLowerCase())!.name
+    }
+    return null
+  } catch { return null }
+}
+
+function Modal({ pms, space, onAdd, onClose, cats }: { pms: PM[]; space: Space; onAdd: (tx: any) => Promise<void>; onClose: () => void; cats: Cat[] }) {
   const [mode, setMode] = useState<'menu' | 'form'>('menu')
   const [type, setType] = useState<TxType>('ingreso')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -161,6 +183,22 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
   const [client, setClient] = useState('')
   const [saving, setSaving] = useState(false)
   const [aiFb, setAiFb] = useState('')
+  const [catSuggestion, setCatSuggestion] = useState<string | null>(null)
+  const [sugLoading, setSugLoading] = useState(false)
+  const [selectedCat, setSelectedCat] = useState('')
+  const spaceCats = cats.filter(c => c.space === space || c.space === 'ambos')
+
+  useEffect(() => {
+    if (!desc.trim() || desc.length < 3) { setCatSuggestion(null); return }
+    const timer = setTimeout(async () => {
+      setSugLoading(true)
+      const suggestion = await geminiSuggestCategory(desc, spaceCats)
+      setCatSuggestion(suggestion)
+      if (suggestion && !selectedCat) setSelectedCat(suggestion)
+      setSugLoading(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [desc])
   const doAI = (t: 'audio' | 'foto' | 'chat') => {
     setMode('form')
     const d = { audio: { a: 800000, d: 'Pago arriendo', t: 'egreso' as TxType, m: '🎙 Escuchando...', r: '✅ "Arriendo 800k" detectado' }, foto: { a: 245000, d: 'Supermercado', t: 'egreso' as TxType, m: '📷 Analizando recibo...', r: '✅ Factura $245.000 detectada' }, chat: { a: 1500000, d: 'Consultoría a cliente', t: 'ingreso' as TxType, m: '💬 Procesando...', r: '✅ "Consultoría $1.5M" detectada' } }[t]
@@ -170,7 +208,7 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
   const save = async () => {
     if (!desc || !amount) return
     setSaving(true)
-    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined })
+    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category: selectedCat || catSuggestion || undefined })
     setSaving(false)
     onClose()
   }
@@ -198,7 +236,21 @@ function Modal({ pms, space, onAdd, onClose }: { pms: PM[]; space: Space; onAdd:
               <div><label style={lbl}>Fecha</label><input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0 }} /></div>
             </div>
             <label style={lbl}>Descripción</label>
-            <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Consultoría..." style={inp} />
+            <input value={desc} onChange={e => { setDesc(e.target.value); setCatSuggestion(null) }} placeholder="Ej: Consultoría..." style={inp} />
+            {(catSuggestion || sugLoading) && (
+              <div style={{ marginTop: '-6px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {sugLoading ? (
+                  <span style={{ fontSize: '11px', color: C.muted }}>✨ Analizando categoría...</span>
+                ) : catSuggestion ? (
+                  <>
+                    <span style={{ fontSize: '11px', color: C.muted }}>✨ Categoría sugerida:</span>
+                    <button onClick={() => setSelectedCat(catSuggestion)} style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: `1px solid ${selectedCat === catSuggestion ? C.primary : 'rgba(139,127,240,.4)'}`, background: selectedCat === catSuggestion ? 'rgba(139,127,240,.2)' : 'transparent', color: C.purple, fontFamily: 'inherit' }}>
+                      {catSuggestion} {selectedCat === catSuggestion ? '✓' : ''}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
               <div><label style={lbl}>Monto</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, marginBottom: 0 }} /></div>
               <div><label style={lbl}>Forma de pago</label><select value={pm} onChange={e => setPm(e.target.value)} style={sel}>{pms.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
@@ -782,7 +834,7 @@ function MainApp() {
         )}
       </div>
 
-      {showModal && <Modal pms={pms} space={space} onAdd={addTx} onClose={() => setShowModal(false)} />}
+      {showModal && <Modal pms={pms} space={space} cats={cats} onAdd={addTx} onClose={() => setShowModal(false)} />}
       {editTx && (
         <EditModal
           tx={editTx}
