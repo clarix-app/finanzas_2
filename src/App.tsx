@@ -465,6 +465,8 @@ function MainApp() {
     await supabase.from('budgets').delete().eq('id', id)
     setBudgets(prev => prev.filter(b => b.id !== id))
   }
+
+  async function addCat() {
     if (!newCat.trim()) return
     const colors = ['#a89ef5', '#60a5fa', '#fb923c', '#4ade80', '#f87171', '#c084fc', '#fbbf24', '#2dd4bf']
     const color = colors[Math.floor(Math.random() * colors.length)]
