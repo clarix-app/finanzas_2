@@ -303,8 +303,9 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
       setSugLoading(true)
       const suggestion = await geminiSuggestCategory(desc, filteredCats)
       setCatSuggestion(suggestion)
+      if (suggestion && !selectedCat) setSelectedCat(suggestion)
       setSugLoading(false)
-    }, 800)
+    }, 300)
     return () => clearTimeout(timer)
   }, [desc, type])
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
