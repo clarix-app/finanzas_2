@@ -8,7 +8,7 @@ const supabase = createClient(
 
 type Space = 'personal' | 'empresa'
 type TxType = 'ingreso' | 'egreso'
-interface Tx { id: string; user_id: string; space: Space; date: string; type: TxType; description: string; amount: number; payment_method?: string; client?: string; created_at: string }
+interface Tx { id: string; user_id: string; space: Space; date: string; type: TxType; description: string; amount: number; payment_method?: string; client?: string; category_name?: string; created_at: string }
 interface Cat { id: string; user_id: string; space: string; type: string; name: string; color: string; is_default: boolean }
 interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
@@ -208,7 +208,7 @@ function Modal({ pms, space, onAdd, onClose, cats }: { pms: PM[]; space: Space; 
   const save = async () => {
     if (!desc || !amount) return
     setSaving(true)
-    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category: selectedCat || catSuggestion || undefined })
+    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category_name: selectedCat || catSuggestion || undefined })
     setSaving(false)
     onClose()
   }
@@ -289,7 +289,7 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
   const [amount, setAmount] = useState(String(tx.amount))
   const [pm, setPm] = useState(tx.payment_method || pms[0]?.name || '')
   const [client, setClient] = useState(tx.client || '')
-  const [selectedCat, setSelectedCat] = useState(tx.description || '')
+  const [selectedCat, setSelectedCat] = useState(tx.category_name || '')
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [catSuggestion, setCatSuggestion] = useState<string | null>(null)
@@ -354,7 +354,7 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
             <button onClick={async () => {
               if (!desc || !amount) return
               setSaving(true)
-              await onSave({ type, date, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category: selectedCat || undefined })
+              await onSave({ type, date, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category_name: selectedCat || undefined })
               setSaving(false)
             }} disabled={saving} style={{ ...btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Guardando...' : 'Guardar'}</button>
           </div>
@@ -597,15 +597,16 @@ function MainApp() {
               {movView === 'lista' ? <>
                 {kpis([{ l: 'Ingresos', v: movFiltered.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0), c: C.purple }, { l: 'Egresos', v: movFiltered.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0), c: C.red }, { l: isEmp ? 'Utilidad' : 'Balance', v: movFiltered.filter(t => t.type === 'ingreso').reduce((s, t) => s + t.amount, 0) - movFiltered.filter(t => t.type === 'egreso').reduce((s, t) => s + t.amount, 0), c: C.green }])}
                 <div style={{ ...card, overflow: 'hidden' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '8px 13px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    <span>Fecha</span>{isEmp && <span>Cat.</span>}<span>Descripción</span>{isEmp && <span>Cliente</span>}<span style={{ textAlign: 'right' }}>Monto</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 110px 90px', padding: '8px 13px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span>Fecha</span>{isEmp && <span>Cat.</span>}<span>Descripción</span><span>Categoría</span>{isEmp && <span>Cliente</span>}<span style={{ textAlign: 'right' }}>Monto</span>
                   </div>
                   {movFiltered.length === 0 ? <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes</div> :
                     movFiltered.map(t => (
-                      <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 90px', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center', fontSize: '12px', color: '#c0c0e0', cursor: 'pointer' }} title="Clic para editar">
+                      <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'grid', gridTemplateColumns: isEmp ? '80px 110px 1fr 80px 90px' : '80px 1fr 110px 90px', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center', fontSize: '12px', color: '#c0c0e0', cursor: 'pointer' }} title="Clic para editar">
                         <span style={{ fontSize: '11px', color: C.muted }}>{t.date.slice(5).replace('-', '/')}</span>
                         {isEmp && <span style={{ fontSize: '11px' }}>{t.description.split(' ').slice(0, 2).join(' ')}</span>}
                         <span>{t.description}</span>
+                        <span style={{ fontSize: '11px', color: C.muted }}>{t.category_name || '—'}</span>
                         {isEmp && <span style={{ fontSize: '11px', color: C.muted }}>{t.client || '—'}</span>}
                         <span style={{ fontWeight: 700, textAlign: 'right', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</span>
                       </div>
