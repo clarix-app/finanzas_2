@@ -251,6 +251,13 @@ function Modal({ pms, space, onAdd, onClose, cats }: { pms: PM[]; space: Space; 
                 ) : null}
               </div>
             )}
+            <label style={lbl}>Categoría</label>
+            <select value={selectedCat} onChange={e => setSelectedCat(e.target.value)} style={{ ...sel, marginBottom: '9px', width: '100%' }}>
+              <option value="">Sin categoría</option>
+              {spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso').map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '9px' }}>
               <div><label style={lbl}>Monto</label><input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, marginBottom: 0 }} /></div>
               <div><label style={lbl}>Forma de pago</label><select value={pm} onChange={e => setPm(e.target.value)} style={sel}>{pms.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
@@ -275,15 +282,31 @@ function Modal({ pms, space, onAdd, onClose, cats }: { pms: PM[]; space: Space; 
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
-function EditModal({ tx, pms, space, onSave, onDelete, onClose }: { tx: Tx; pms: PM[]; space: Space; onSave: (data: any) => Promise<void>; onDelete: () => Promise<void>; onClose: () => void }) {
+function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx; pms: PM[]; space: Space; cats: Cat[]; onSave: (data: any) => Promise<void>; onDelete: () => Promise<void>; onClose: () => void }) {
   const [type, setType] = useState<TxType>(tx.type)
   const [date, setDate] = useState(tx.date)
   const [desc, setDesc] = useState(tx.description)
   const [amount, setAmount] = useState(String(tx.amount))
   const [pm, setPm] = useState(tx.payment_method || pms[0]?.name || '')
   const [client, setClient] = useState(tx.client || '')
+  const [selectedCat, setSelectedCat] = useState(tx.description || '')
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [catSuggestion, setCatSuggestion] = useState<string | null>(null)
+  const [sugLoading, setSugLoading] = useState(false)
+  const spaceCats = cats.filter(c => c.space === space || c.space === 'ambos')
+  const filteredCats = spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso')
+
+  useEffect(() => {
+    if (!desc.trim() || desc.length < 3) { setCatSuggestion(null); return }
+    const timer = setTimeout(async () => {
+      setSugLoading(true)
+      const suggestion = await geminiSuggestCategory(desc, filteredCats)
+      setCatSuggestion(suggestion)
+      setSugLoading(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [desc, type])
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
   const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '14px', padding: '20px', width: '375px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif" }
   return (
@@ -302,6 +325,19 @@ function EditModal({ tx, pms, space, onSave, onDelete, onClose }: { tx: Tx; pms:
           <div><label style={lbl}>Forma de pago</label><select value={pm} onChange={e => setPm(e.target.value)} style={sel}>{pms.map(p => <option key={p.id}>{p.name}</option>)}</select></div>
         </div>
         {space === 'empresa' && <><label style={lbl}>Cliente</label><input value={client} onChange={e => setClient(e.target.value)} placeholder="Nombre del cliente..." style={inp} /></>}
+        <label style={lbl}>Categoría</label>
+        {(catSuggestion || sugLoading) && (
+          <div style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {sugLoading ? <span style={{ fontSize: '11px', color: C.muted }}>✨ Analizando...</span> : catSuggestion ? <>
+              <span style={{ fontSize: '11px', color: C.muted }}>✨ Sugerida:</span>
+              <button onClick={() => setSelectedCat(catSuggestion)} style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'rgba(139,127,240,.2)', color: C.purple, fontFamily: 'inherit' }}>{catSuggestion} ✓</button>
+            </> : null}
+          </div>
+        )}
+        <select value={selectedCat} onChange={e => setSelectedCat(e.target.value)} style={{ ...sel, marginBottom: '12px', width: '100%' }}>
+          <option value="">Sin categoría</option>
+          {filteredCats.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </select>
         <div style={{ display: 'flex', gap: '7px', marginTop: '4px', justifyContent: 'space-between' }}>
           {!confirming ? (
             <button onClick={() => setConfirming(true)} style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '12px', cursor: 'pointer', border: '1px solid rgba(248,113,113,.3)', background: 'rgba(248,113,113,.1)', color: C.red, fontFamily: 'inherit' }}>🗑 Eliminar</button>
@@ -317,7 +353,7 @@ function EditModal({ tx, pms, space, onSave, onDelete, onClose }: { tx: Tx; pms:
             <button onClick={async () => {
               if (!desc || !amount) return
               setSaving(true)
-              await onSave({ type, date, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined })
+              await onSave({ type, date, description: desc, amount: Number(amount), payment_method: pm, client: space === 'empresa' ? client : undefined, category: selectedCat || undefined })
               setSaving(false)
             }} disabled={saving} style={{ ...btn, opacity: saving ? 0.6 : 1 }}>{saving ? 'Guardando...' : 'Guardar'}</button>
           </div>
@@ -840,6 +876,7 @@ function MainApp() {
           tx={editTx}
           pms={pms}
           space={space}
+          cats={cats}
           onSave={async (data) => { await updateTx(editTx.id, data); setEditTx(null) }}
           onDelete={async () => { await delTx(editTx.id); setEditTx(null) }}
           onClose={() => setEditTx(null)}
