@@ -13,6 +13,10 @@ interface Cat { id: string; user_id: string; space: string; type: string; name: 
 interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
 interface Budget { id: string; user_id: string; space: Space; category_name: string; limit_amount: number }
+interface Profile { id: string; name: string; email: string; plan: string }
+interface AdminUser { id: string; email: string; name: string; plan: string; created_at: string; total_movimientos: number; ultimo_movimiento: string | null }
+
+const ADMIN_EMAIL = 'fpadillav1@gmail.com'
 
 const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
 const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
@@ -154,10 +158,9 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
 
 async function geminiSuggestCategory(desc: string, cats: Cat[]): Promise<string | null> {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey || !desc.trim() || cats.length === 0) return null
+    if (!desc.trim() || cats.length === 0) return null
     const catNames = cats.map(c => c.name).join(', ')
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -365,6 +368,33 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
   )
 }
 
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' }
+  const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '16px', padding: '28px', width: '380px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", textAlign: 'center' }
+  return (
+    <div style={overlay} onClick={onClose}>
+      <div style={box} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚡</div>
+        <div style={{ fontWeight: 700, fontSize: '20px', color: '#e8e8f0', marginBottom: '6px' }}>Clarix Pro</div>
+        <div style={{ fontSize: '13px', color: '#6060a0', marginBottom: '20px', lineHeight: 1.5 }}>Desbloquea el registro de movimientos, categorías, presupuesto e IA</div>
+        <div style={{ background: '#12121e', borderRadius: '12px', border: '1px solid #252535', padding: '16px', marginBottom: '20px' }}>
+          <div style={{ fontSize: '32px', fontWeight: 700, color: '#e8e8f0', letterSpacing: '-.04em' }}>$5 <span style={{ fontSize: '14px', color: '#6060a0', fontWeight: 400 }}>USD/mes</span></div>
+          <div style={{ fontSize: '11px', color: '#5555a0', marginTop: '4px' }}>Cancela cuando quieras</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px', textAlign: 'left' }}>
+          {['✅ Movimientos ilimitados', '✅ Categorías personalizadas', '✅ Presupuesto por categoría', '✅ Autocategorización con IA', '✅ Reportes y Pareto 80/20', '✅ Espacios Personal y Empresa'].map((f, i) => (
+            <div key={i} style={{ fontSize: '12px', color: '#c0c0e0' }}>{f}</div>
+          ))}
+        </div>
+        <a href="mailto:tu@email.com?subject=Quiero%20Clarix%20Pro" style={{ display: 'block', padding: '13px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', textDecoration: 'none', marginBottom: '10px' }}>
+          Suscribirme por $5/mes →
+        </a>
+        <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px solid #252535', borderRadius: '9px', color: '#6060a0', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Ahora no</button>
+      </div>
+    </div>
+  )
+}
+
 function BudgetCustomRow({ onSave }: { onSave: (name: string, amt: number) => void }) {
   const [name, setName] = useState('')
   const [val, setVal] = useState('')
@@ -425,6 +455,98 @@ function BudgetRow({ cat, onSave }: { cat: any; onSave: (amt: number) => void })
   )
 }
 
+function AdminPage() {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [updating, setUpdating] = useState<string | null>(null)
+
+  useEffect(() => { loadUsers() }, [])
+
+  async function loadUsers() {
+    setLoading(true)
+    const { data } = await supabase.from('admin_users').select('*')
+    if (data) setUsers(data)
+    setLoading(false)
+  }
+
+  async function togglePlan(userId: string, currentPlan: string) {
+    if (userId === ADMIN_EMAIL) return
+    const newPlan = currentPlan === 'pro' ? 'free' : 'pro'
+    setUpdating(userId)
+    await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    setUpdating(null)
+  }
+
+  const filtered = users.filter(u =>
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.name?.toLowerCase().includes(search.toLowerCase())
+  )
+  const totalPro = users.filter(u => u.plan === 'pro').length
+  const totalFree = users.filter(u => u.plan !== 'pro').length
+
+  return (
+    <div style={{ padding: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>👑 Panel Admin</div>
+          <div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Gestión de usuarios Clarix</div>
+        </div>
+        <button onClick={loadUsers} style={{ ...btn, fontSize: '11px', padding: '6px 12px' }}>↻ Actualizar</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '16px' }}>
+        {[{ l: 'Total usuarios', v: users.length, c: C.text, ic: '👥' }, { l: 'Usuarios Pro', v: totalPro, c: C.green, ic: '⚡' }, { l: 'Usuarios Free', v: totalFree, c: C.muted, ic: '🔒' }].map((k, i) => (
+          <div key={i} style={{ ...card, padding: '14px 16px' }}>
+            <div style={{ fontSize: '18px', marginBottom: '6px' }}>{k.ic}</div>
+            <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
+            <div style={{ fontWeight: 700, fontSize: '1.8rem', marginTop: '4px', color: k.c, letterSpacing: '-.04em' }}>{k.v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ ...card, padding: '14px 16px', marginBottom: '16px', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.08))', border: '1px solid rgba(139,127,240,.3)' }}>
+        <div style={{ fontSize: '10px', color: C.primary, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>💰 MRR Estimado</div>
+        <div style={{ fontWeight: 700, fontSize: '2rem', color: C.text, letterSpacing: '-.04em' }}>${(totalPro * 5).toLocaleString()} <span style={{ fontSize: '14px', color: C.muted, fontWeight: 400 }}>USD/mes</span></div>
+        <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{totalPro} usuarios Pro × $5 USD</div>
+      </div>
+
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por email o nombre..." style={{ ...inp, marginBottom: '12px' }} />
+
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 60px 100px 80px', padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          <span>Usuario</span><span>Registro</span><span>Movs.</span><span>Último mov.</span><span style={{ textAlign: 'right' }}>Plan</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>Cargando usuarios...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>No se encontraron usuarios</div>
+        ) : filtered.map(u => (
+          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 60px 100px 80px', padding: '10px 14px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 500, color: C.text }}>{u.name || '—'} {u.email === ADMIN_EMAIL ? '👑' : ''}</div>
+              <div style={{ fontSize: '10px', color: C.muted, marginTop: '1px' }}>{u.email}</div>
+            </div>
+            <div style={{ fontSize: '10px', color: C.muted }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</div>
+            <div style={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>{u.total_movimientos || 0}</div>
+            <div style={{ fontSize: '10px', color: C.muted }}>{u.ultimo_movimiento ? new Date(u.ultimo_movimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</div>
+            <div style={{ textAlign: 'right' }}>
+              <button
+                onClick={() => togglePlan(u.id, u.plan)}
+                disabled={updating === u.id || u.email === ADMIN_EMAIL}
+                style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1 }}>
+                {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: '10px', color: C.muted, marginTop: '8px', textAlign: 'center' }}>Clic en el badge para cambiar Free ↔ Pro</div>
+    </div>
+  )
+}
+
 function MainApp() {
   const { user, signOut } = useAuth()
   const [page, setPage] = useState('dashboard')
@@ -439,6 +561,8 @@ function MainApp() {
   const [showModal, setShowModal] = useState(false)
   const [editTx, setEditTx] = useState<Tx | null>(null)
   const [budgets, setBudgets] = useState<Budget[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const [adjSub, setAdjSub] = useState('')
   const [newCat, setNewCat] = useState('')
   const [newCatType, setNewCatType] = useState('ingreso')
@@ -453,18 +577,20 @@ function MainApp() {
 
   async function loadAll() {
     setLoading(true)
-    const [t, c, p, g, b] = await Promise.all([
+    const [t, c, p, g, b, pr] = await Promise.all([
       supabase.from('transactions').select('*').eq('user_id', user!.id).eq('space', space).order('date', { ascending: false }),
       supabase.from('categories').select('*').eq('user_id', user!.id),
       supabase.from('payment_methods').select('*').eq('user_id', user!.id),
       supabase.from('gamification').select('*').eq('user_id', user!.id).single(),
       supabase.from('budgets').select('*').eq('user_id', user!.id).eq('space', space),
+      supabase.from('profiles').select('*').eq('id', user!.id).single(),
     ])
     if (t.data) setTxs(t.data)
     if (c.data) setCats(c.data)
     if (p.data) setPms(p.data)
     if (g.data) setGami(g.data)
     if (b.data) setBudgets(b.data)
+    if (pr.data) setProfile(pr.data)
     setLoading(false)
   }
 
@@ -607,6 +733,9 @@ function MainApp() {
     { id: 'presupuesto', l: 'Presupuesto', d: 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z' },
     { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
   ]
+  const isAdmin = user?.email === ADMIN_EMAIL
+  const isPro = profile?.plan === 'pro'
+
   const sb: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 9px', borderRadius: '9px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, marginBottom: '2px', border: 'none', width: '100%', textAlign: 'left', fontFamily: 'inherit', transition: 'all .15s' }
   const ph = (title: string, sub: string, extra?: ReactNode) => (
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -614,7 +743,10 @@ function MainApp() {
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
         <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
         {extra}
-        <button style={btn} onClick={() => setShowModal(true)}>+ Registrar</button>
+        {isPro
+          ? <button style={btn} onClick={() => setShowModal(true)}>+ Registrar</button>
+          : <button style={{ ...btn, background: 'rgba(139,127,240,.3)', position: 'relative' }} onClick={() => setShowUpgrade(true)}>🔒 Registrar</button>
+        }
       </div>
     </div>
   )
@@ -659,9 +791,20 @@ function MainApp() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             Ajustes
           </button>
+          {isAdmin && (
+            <button onClick={() => setPage('admin')} style={{ ...sb, background: page === 'admin' ? 'rgba(251,191,36,.15)' : 'transparent', color: page === 'admin' ? '#fbbf24' : '#8888b8' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+              Admin
+            </button>
+          )}
         </nav>
         <div style={{ padding: '10px 12px', borderTop: '1px solid #1e1e2e', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div><div style={{ fontSize: '11px', fontWeight: 500, color: C.text }}>{userName}</div><div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>{user?.email}</div></div>
+          <div><div style={{ fontSize: '11px', fontWeight: 500, color: C.text }}>{userName}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', color: C.sub }}>{user?.email}</div>
+              {isAdmin && <span style={{ fontSize: '8px', background: 'rgba(251,191,36,.2)', color: '#fbbf24', padding: '1px 4px', borderRadius: '3px', fontWeight: 700 }}>ADMIN</span>}
+            </div>
+          </div>
           <button onClick={signOut} title="Cerrar sesión" style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>→</button>
         </div>
       </div>
@@ -671,8 +814,18 @@ function MainApp() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted }}>Cargando datos...</div>
         ) : (
           <div style={{ padding: '20px' }}>
+            {page === 'admin' && isAdmin && <AdminPage />}
             {page === 'dashboard' && <>
               {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
+              {!isPro && (
+                <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div>
+                    <div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos, usa IA y mucho más</div>
+                  </div>
+                  <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
+                </div>
+              )}
               <div style={{ ...card, padding: '16px 18px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', top: '-20px', right: '-20px', width: '100px', height: '100px', background: 'radial-gradient(circle,rgba(139,127,240,.08),transparent 70%)', pointerEvents: 'none' }} />
                 <div>
@@ -1043,7 +1196,7 @@ function MainApp() {
         )}
       </div>
 
-      {showModal && <Modal pms={pms} space={space} cats={cats} onAdd={addTx} onClose={() => setShowModal(false)} />}
+      {showModal && isPro && <Modal pms={pms} space={space} cats={cats} onAdd={addTx} onClose={() => setShowModal(false)} />}
       {editTx && (
         <EditModal
           tx={editTx}
@@ -1055,6 +1208,7 @@ function MainApp() {
           onClose={() => setEditTx(null)}
         />
       )}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   )
 }
