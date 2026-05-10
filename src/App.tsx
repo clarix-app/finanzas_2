@@ -12,6 +12,7 @@ interface Tx { id: string; user_id: string; space: Space; date: string; type: Tx
 interface Cat { id: string; user_id: string; space: string; type: string; name: string; color: string; is_default: boolean }
 interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
+interface Budget { id: string; user_id: string; space: Space; category_name: string; limit_amount: number }
 
 const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
 const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
@@ -364,6 +365,33 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
   )
 }
 
+function BudgetRow({ cat, onSave }: { cat: any; onSave: (amt: number) => void }) {
+  const [val, setVal] = useState('')
+  const [saving, setSaving] = useState(false)
+  return (
+    <div style={{ ...{background:'#12121e',borderRadius:'12px',border:'1px solid #252535'}, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
+      <span style={{ fontSize: '12px', flex: 1, color: '#c0c0e0' }}>{cat.name}</span>
+      <input
+        type="number"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        placeholder="Límite mensual"
+        style={{ width: '130px', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '7px', padding: '5px 8px', color: '#e8e8f0', fontSize: '11px', outline: 'none', fontFamily: 'inherit' }}
+      />
+      <button onClick={async () => {
+        if (!val || Number(val) <= 0) return
+        setSaving(true)
+        await onSave(Number(val))
+        setVal('')
+        setSaving(false)
+      }} disabled={saving} style={{ padding: '5px 12px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+        {saving ? '...' : 'Agregar'}
+      </button>
+    </div>
+  )
+}
+
 function MainApp() {
   const { user, signOut } = useAuth()
   const [page, setPage] = useState('dashboard')
@@ -377,6 +405,7 @@ function MainApp() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editTx, setEditTx] = useState<Tx | null>(null)
+  const [budgets, setBudgets] = useState<Budget[]>([])
   const [adjSub, setAdjSub] = useState('')
   const [newCat, setNewCat] = useState('')
   const [newCatType, setNewCatType] = useState('ingreso')
@@ -391,16 +420,18 @@ function MainApp() {
 
   async function loadAll() {
     setLoading(true)
-    const [t, c, p, g] = await Promise.all([
+    const [t, c, p, g, b] = await Promise.all([
       supabase.from('transactions').select('*').eq('user_id', user!.id).eq('space', space).order('date', { ascending: false }),
       supabase.from('categories').select('*').eq('user_id', user!.id),
       supabase.from('payment_methods').select('*').eq('user_id', user!.id),
       supabase.from('gamification').select('*').eq('user_id', user!.id).single(),
+      supabase.from('budgets').select('*').eq('user_id', user!.id).eq('space', space),
     ])
     if (t.data) setTxs(t.data)
     if (c.data) setCats(c.data)
     if (p.data) setPms(p.data)
     if (g.data) setGami(g.data)
+    if (b.data) setBudgets(b.data)
     setLoading(false)
   }
 
@@ -425,7 +456,15 @@ function MainApp() {
     setTxs(prev => prev.filter(t => t.id !== id))
   }
 
-  async function addCat() {
+  async function upsertBudget(category_name: string, limit_amount: number) {
+    const { data } = await supabase.from('budgets').upsert({ user_id: user!.id, space, category_name, limit_amount }, { onConflict: 'user_id,space,category_name' }).select().single()
+    if (data) setBudgets(prev => { const exists = prev.find(b => b.category_name === category_name); return exists ? prev.map(b => b.category_name === category_name ? data : b) : [...prev, data] })
+  }
+
+  async function deleteBudget(id: string) {
+    await supabase.from('budgets').delete().eq('id', id)
+    setBudgets(prev => prev.filter(b => b.id !== id))
+  }
     if (!newCat.trim()) return
     const colors = ['#a89ef5', '#60a5fa', '#fb923c', '#4ade80', '#f87171', '#c084fc', '#fbbf24', '#2dd4bf']
     const color = colors[Math.floor(Math.random() * colors.length)]
@@ -473,6 +512,50 @@ function MainApp() {
   const bestM = byMonthData.reduce((b, m, i) => m.ing > (byMonthData[b]?.ing || 0) ? i : b, 0)
   const maxV = Math.max(...byMonthData.map(m => Math.max(m.ing, m.eg))) || 1
   const groupBy = (type: string) => { const m: Record<string, number> = {}; txMonth.filter(t => t.type === type).forEach(t => { m[t.description] = (m[t.description] || 0) + t.amount }); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, amount]) => ({ name, amount })) }
+  const groupByCat = (type: string) => { const m: Record<string, number> = {}; txMonth.filter(t => t.type === type).forEach(t => { const k = t.category_name || 'Sin categoría'; m[k] = (m[k] || 0) + t.amount }); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, amount]) => ({ name, amount })) }
+
+  const DONUT_COLORS = ['#8b7ff0','#f87171','#4ade80','#fbbf24','#60a5fa','#fb923c','#c084fc','#2dd4bf','#818cf8','#f472b6']
+
+  const DonutChart = ({ items, total, size = 120 }: { items: {name:string;amount:number}[]; total: number; size?: number }) => {
+    if (items.length === 0 || total === 0) return <div style={{ textAlign: 'center', color: C.muted, fontSize: '11px', padding: '20px 0' }}>Sin datos</div>
+    const r = 40; const cx = 50; const cy = 50; const stroke = 14
+    let offset = 0
+    const circumference = 2 * Math.PI * r
+    const slices = items.slice(0, 8).map((it, i) => {
+      const pct = it.amount / total
+      const dash = pct * circumference
+      const gap = circumference - dash
+      const slice = { pct, dash, gap, offset, color: DONUT_COLORS[i % DONUT_COLORS.length] }
+      offset += dash
+      return slice
+    })
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <svg width={size} height={size} viewBox="0 0 100 100" style={{ flexShrink: 0 }}>
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a2e" strokeWidth={stroke} />
+          {slices.map((s, i) => (
+            <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+              stroke={s.color} strokeWidth={stroke}
+              strokeDasharray={`${s.dash} ${s.gap}`}
+              strokeDashoffset={-s.offset}
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '50px 50px' }}
+            />
+          ))}
+          <text x={cx} y={cy - 4} textAnchor="middle" fill={C.text} fontSize="10" fontWeight="700">{items.length}</text>
+          <text x={cx} y={cy + 8} textAnchor="middle" fill={C.muted} fontSize="6">categorías</text>
+        </svg>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {items.slice(0, 6).map((it, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: DONUT_COLORS[i % DONUT_COLORS.length], flexShrink: 0 }} />
+              <span style={{ fontSize: '10px', color: '#c0c0e0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+              <span style={{ fontSize: '10px', fontWeight: 700, color: DONUT_COLORS[i % DONUT_COLORS.length] }}>{Math.round(it.amount / total * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
   const rItems = paretoV === 'ingresos' ? groupBy('ingreso') : groupBy('egreso')
   const rTotal = paretoV === 'ingresos' ? ing : eg
   const rColor = paretoV === 'ingresos' ? C.purple : C.red
@@ -482,12 +565,11 @@ function MainApp() {
   const cutIdx = rCalc.findIndex(it => it.acum >= 80)
   const countTop = cutIdx === -1 ? rCalc.length : cutIdx + 1
   const pctTop = rCalc[Math.max(0, countTop - 1)]?.acum || 0
-  const defBudgets = isEmp ? [{ cat: 'Publicidad', limit: 1000000, color: C.red }, { cat: 'Asistente virtual', limit: 1500000, color: '#c084fc' }, { cat: 'Software', limit: 300000, color: '#38bdf8' }, { cat: 'Transporte', limit: 200000, color: '#818cf8' }] : [{ cat: 'Vivienda', limit: 900000, color: '#60a5fa' }, { cat: 'Alimentación', limit: 300000, color: '#fb923c' }, { cat: 'Transporte', limit: 150000, color: '#c084fc' }, { cat: 'Salud', limit: 200000, color: C.red }, { cat: 'Entretenimiento', limit: 100000, color: '#fbbf24' }]
   const navItems = [
     { id: 'dashboard', l: 'Inicio', d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
     { id: 'movimientos', l: 'Movimientos', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
     { id: 'consolidado', l: 'Consolidado', d: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
-    { id: 'presupuesto', l: 'Presupuesto', d: 'M3 3h18v18H3zM3 9h18M9 21V9' },
+    { id: 'presupuesto', l: 'Presupuesto', d: 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z' },
     { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
   ]
   const sb: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 9px', borderRadius: '9px', cursor: 'pointer', fontSize: '12px', fontWeight: 500, marginBottom: '2px', border: 'none', width: '100%', textAlign: 'left', fontFamily: 'inherit', transition: 'all .15s' }
@@ -570,6 +652,10 @@ function MainApp() {
                 </div>}
               </div>
               {kpis([{ l: 'Ingresos', v: ing, c: C.purple }, { l: isEmp ? 'Egresos' : 'Gastos', v: eg, c: C.red }, { l: isEmp ? 'Utilidad' : 'Ahorro', v: util, c: C.green }])}
+              <div style={{ ...card, padding: '14px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '12px' }}>Gastos por categoría</div>
+                <DonutChart items={groupByCat('egreso')} total={eg} />
+              </div>
               <div style={{ ...card, padding: '14px' }}>
                 <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Últimos movimientos</div>
                 {txMonth.length === 0 ? <div style={{ textAlign: 'center', padding: '20px', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes. ¡Registra el primero!</div> :
@@ -679,28 +765,66 @@ function MainApp() {
               </div>
             </>}
 
-            {page === 'presupuesto' && <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Presupuesto</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Límites por categoría · {MONTHS[month]} {year}</div></div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {defBudgets.map((b, i) => {
-                  const spent = txMonth.filter(t => t.type === 'egreso' && t.description.toLowerCase().includes(b.cat.toLowerCase())).reduce((s, t) => s + t.amount, 0)
-                  const pct = Math.min(100, Math.round(spent / b.limit * 100))
-                  const ov = spent > b.limit
-                  return (
-                    <div key={i} style={{ ...card, padding: '13px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '10px', height: '10px', borderRadius: '50%', background: b.color }} /><span style={{ fontSize: '13px', fontWeight: 500, color: C.text }}>{b.cat}</span></div>
-                        <span style={{ fontSize: '11px', color: ov ? C.red : C.muted }}>{fmt(spent)} / {fmt(b.limit)}</span>
+            {page === 'presupuesto' && (() => {
+              const egressCats = spaceCats.filter(c => c.type !== 'ingreso')
+              const allCatsWithBudget = egressCats.map(c => {
+                const budget = budgets.find(b => b.category_name === c.name)
+                const spent = txMonth.filter(t => t.type === 'egreso' && t.category_name === c.name).reduce((s, t) => s + t.amount, 0)
+                const limit = budget?.limit_amount || 0
+                const pct = limit > 0 ? Math.min(100, Math.round(spent / limit * 100)) : 0
+                const warning = pct >= 80 && pct < 100
+                const over = pct >= 100
+                return { ...c, spent, limit, pct, warning, over, budgetId: budget?.id }
+              })
+              const withBudget = allCatsWithBudget.filter(c => c.limit > 0)
+              const withoutBudget = allCatsWithBudget.filter(c => c.limit === 0)
+              return <>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Presupuesto</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{isEmp ? 'Empresa' : 'Personal'} · {MONTHS[month]} {year}</div></div>
+                  <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
+                </div>
+
+                {withBudget.length === 0 && (
+                  <div style={{ ...card, padding: '24px', textAlign: 'center', marginBottom: '14px' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>💰</div>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: C.text, marginBottom: '4px' }}>Sin límites configurados</div>
+                    <div style={{ fontSize: '11px', color: C.muted }}>Agrega un límite a tus categorías para controlar tus gastos</div>
+                  </div>
+                )}
+
+                {withBudget.map((c, i) => (
+                  <div key={i} style={{ ...card, padding: '14px 16px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color }} />
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{c.name}</span>
+                        {c.warning && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(251,191,36,.15)', color: '#fbbf24', fontWeight: 600 }}>⚠ 80%+</span>}
+                        {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
                       </div>
-                      <div style={{ background: '#1a1a2e', height: '7px', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: ov ? C.red : b.color, borderRadius: '99px' }} /></div>
-                      <div style={{ fontSize: '10px', marginTop: '5px', color: ov ? C.red : C.muted }}>{pct}% utilizado{ov ? ' · ⚠ Límite superado' : ''}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmt(c.spent)} / {fmt(c.limit)}</span>
+                        <button onClick={() => { if (c.budgetId) deleteBudget(c.budgetId) }} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>×</button>
+                      </div>
                     </div>
-                  )
-                })}
-              </div>
-            </>}
+                    <div style={{ background: '#1a1a2e', height: '8px', borderRadius: '99px', overflow: 'hidden', marginBottom: '5px' }}>
+                      <div style={{ height: '100%', width: `${c.pct}%`, background: c.over ? C.red : c.warning ? '#fbbf24' : c.color, borderRadius: '99px', transition: 'width .3s' }} />
+                    </div>
+                    <div style={{ fontSize: '10px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{c.pct}% utilizado{c.over ? ' · Límite superado' : c.warning ? ' · Casi al límite' : ''}</div>
+                  </div>
+                ))}
+
+                <div style={{ marginTop: withBudget.length > 0 ? '6px' : '0' }}>
+                  <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>
+                    {withBudget.length > 0 ? 'Agregar límite a más categorías' : 'Tus categorías de gasto'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {withoutBudget.map((c, i) => (
+                      <BudgetRow key={i} cat={c} onSave={(amt) => upsertBudget(c.name, amt)} />
+                    ))}
+                  </div>
+                </div>
+              </>
+            })()}
 
             {page === 'reportes' && <>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -738,13 +862,21 @@ function MainApp() {
               </>}
               {(rTab === 'ingresos' || rTab === 'gastos') && (() => {
                 const items = rTab === 'ingresos' ? groupBy('ingreso') : groupBy('egreso')
+                const catItems = rTab === 'ingresos' ? groupByCat('ingreso') : groupByCat('egreso')
                 const total = rTab === 'ingresos' ? ing : eg
                 const color = rTab === 'ingresos' ? C.purple : C.red
                 return <>
                   <div style={{ fontWeight: 700, fontSize: '22px', letterSpacing: '-.04em', marginBottom: '14px', color }}>{fmt(total)}</div>
-                  <div style={{ ...card, padding: '14px' }}>
-                    {items.length === 0 ? <div style={{ textAlign: 'center', color: C.muted, fontSize: '12px', padding: '20px' }}>No hay datos este mes</div> :
-                      items.map((it, i) => { const pct = total > 0 ? Math.round(it.amount / total * 100) : 0; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '9px' }}><span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0' }}>{it.name}</span><div style={{ flex: 1.5, height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div><span style={{ fontSize: '10px', color: C.muted, minWidth: '26px', textAlign: 'right' }}>{pct}%</span><span style={{ fontWeight: 700, fontSize: '11px', color, minWidth: '80px', textAlign: 'right' }}>{fmt(it.amount)}</span></div> })}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div style={{ ...card, padding: '14px' }}>
+                      <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Por categoría</div>
+                      <DonutChart items={catItems} total={total} size={100} />
+                    </div>
+                    <div style={{ ...card, padding: '14px' }}>
+                      <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Top movimientos</div>
+                      {items.length === 0 ? <div style={{ textAlign: 'center', color: C.muted, fontSize: '12px', padding: '20px' }}>No hay datos este mes</div> :
+                        items.slice(0, 5).map((it, i) => { const pct = total > 0 ? Math.round(it.amount / total * 100) : 0; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span><div style={{ width: '50px', height: '4px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div><span style={{ fontSize: '10px', fontWeight: 700, color, minWidth: '60px', textAlign: 'right' }}>{fmt(it.amount)}</span></div> })}
+                    </div>
                   </div>
                 </>
               })()}
