@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react'
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
 import { createClient, User } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -56,32 +56,9 @@ function AuthProvider({ children }: { children: ReactNode }) {
 function useAuth() { const c = useContext(AuthContext); if (!c) throw new Error('useAuth'); return c }
 
 // ── GEMINI ────────────────────────────────────────────────────────────────────
-async function geminiSuggestCategory(desc: string, cats: Cat[]): Promise<string | null> {
-  try {
-    if (!desc.trim() || cats.length === 0) return null
-    const res = await fetch('/api/gemini', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: `Categoriza este movimiento financiero. Responde SOLO con el nombre exacto de la categoría.\nMovimiento: "${desc}"\nCategorías: ${cats.map(c => c.name).join(', ')}\nCategoría:` }] }], generationConfig: { maxOutputTokens: 20, temperature: 0.1 } })
-    })
     const data = await res.json()
     const suggested = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
     return cats.find(c => c.name.toLowerCase() === suggested?.toLowerCase())?.name || null
-  } catch { return null }
-}
-
-async function geminiParseAudio(text: string, cats: Cat[]): Promise<{ description: string; amount: number; type: TxType; category_name?: string } | null> {
-  try {
-    const res = await fetch('/api/gemini', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `Extrae los datos de este movimiento financiero hablado. Responde SOLO con JSON válido sin markdown.\nTexto: "${text}"\nCategorías disponibles: ${cats.map(c => c.name).join(', ')}\nFormato: {"description":"nombre del gasto/ingreso","amount":numero,"type":"ingreso o egreso","category_name":"categoría o null"}` }] }],
-        generationConfig: { maxOutputTokens: 100, temperature: 0.1 }
-      })
-    })
-    const data = await res.json()
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-    const clean = raw?.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean)
   } catch { return null }
 }
 
@@ -203,91 +180,14 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
 
 // ── REGISTER MODAL (bottom sheet) ─────────────────────────────────────────────
 function RegisterModal({ pms, space, cats, onAdd, onClose }: { pms: PM[]; space: Space; cats: Cat[]; onAdd: (tx: any) => Promise<void>; onClose: () => void }) {
-  const [step, setStep] = useState<'menu' | 'form' | 'audio'>('menu')
   const [type, setType] = useState<TxType>('egreso')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [desc, setDesc] = useState('')
   const [amount, setAmount] = useState('')
   const [pm, setPm] = useState(pms[0]?.name || '')
   const [selectedCat, setSelectedCat] = useState('')
-  const [catSuggestion, setCatSuggestion] = useState<string | null>(null)
-  const [sugLoading, setSugLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [recording, setRecording] = useState(false)
-  const [audioFb, setAudioFb] = useState('')
-  const mediaRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
   const spaceCats = cats.filter(c => c.space === space || c.space === 'ambos')
-
-  useEffect(() => {
-    if (!desc.trim() || desc.length < 3) { setCatSuggestion(null); return }
-    const t = setTimeout(async () => {
-      setSugLoading(true)
-      const s = await geminiSuggestCategory(desc, spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso'))
-      setCatSuggestion(s); if (s && !selectedCat) setSelectedCat(s)
-      setSugLoading(false)
-    }, 800)
-    return () => clearTimeout(t)
-  }, [desc, type])
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mr = new MediaRecorder(stream)
-      chunksRef.current = []
-      mr.ondataavailable = e => chunksRef.current.push(e.data)
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop())
-        setAudioFb('🤖 Analizando con IA...')
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        const reader = new FileReader()
-        reader.readAsDataURL(blob)
-        reader.onload = async () => {
-          // Use Web Speech API result or fallback
-          setAudioFb('✅ Procesando texto...')
-        }
-      }
-      mr.start()
-      mediaRef.current = mr
-      setRecording(true)
-      setAudioFb('🎙 Grabando... toca de nuevo para detener')
-    } catch { setAudioFb('❌ No se pudo acceder al micrófono') }
-  }
-
-  const stopRecording = () => {
-    mediaRef.current?.stop()
-    setRecording(false)
-  }
-
-  const startSpeechRecognition = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) { setAudioFb('❌ Tu navegador no soporta reconocimiento de voz'); return }
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'es-CO'
-    recognition.continuous = false
-    recognition.interimResults = false
-    setRecording(true)
-    setAudioFb('🎙 Habla ahora...')
-    recognition.onresult = async (event: any) => {
-      const text = event.results[0][0].transcript
-      setAudioFb(`📝 "${text}" — Analizando...`)
-      setRecording(false)
-      const parsed = await geminiParseAudio(text, spaceCats)
-      if (parsed) {
-        setDesc(parsed.description)
-        setAmount(String(parsed.amount))
-        setType(parsed.type)
-        if (parsed.category_name) setSelectedCat(parsed.category_name)
-        setAudioFb(`✅ Detectado: ${parsed.description} $${parsed.amount.toLocaleString('es-CO')}`)
-        setStep('form')
-      } else {
-        setAudioFb('❌ No se pudo interpretar. Intenta de nuevo.')
-      }
-    }
-    recognition.onerror = () => { setAudioFb('❌ Error al escuchar. Intenta de nuevo.'); setRecording(false) }
-    recognition.onend = () => setRecording(false)
-    recognition.start()
-  }
 
   const save = async () => {
     if (!desc || !amount) return
@@ -297,102 +197,54 @@ function RegisterModal({ pms, space, cats, onAdd, onClose }: { pms: PM[]; space:
     onClose()
   }
 
-  const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }
-  const sheet: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '24px 24px 0 0', padding: '20px 20px 40px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto', fontFamily: "'DM Sans', sans-serif" }
-
   return (
-    <div style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={e => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '24px 24px 0 0', padding: '20px 20px 40px', width: '100%', maxWidth: '500px', maxHeight: '92vh', overflowY: 'auto', fontFamily: "'DM Sans', sans-serif" }} onClick={e => e.stopPropagation()}>
         <div style={{ width: '40px', height: '4px', background: '#2a2a3e', borderRadius: '99px', margin: '0 auto 20px' }} />
+        <div style={{ fontWeight: 700, fontSize: '18px', color: C.text, marginBottom: '16px' }}>Nueva transacción</div>
 
-        {step === 'menu' && (
-          <>
-            <div style={{ fontWeight: 700, fontSize: '18px', color: C.text, marginBottom: '20px', textAlign: 'center' }}>¿Cómo registrar?</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-              {[{ id: 'manual', ic: '✏️', l: 'Manual', d: 'Escribe los datos' }, { id: 'audio', ic: '🎙', l: 'Audio', d: 'Habla y la IA lo registra' }].map(o => (
-                <div key={o.id} onClick={() => { if (o.id === 'manual') setStep('form'); else setStep('audio') }} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '20px 16px', cursor: 'pointer', textAlign: 'center' }}>
-                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>{o.ic}</div>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{o.l}</div>
-                  <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{o.d}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={onClose} style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.muted, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-          </>
-        )}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {(['egreso', 'ingreso'] as TxType[]).map(t => (
+            <button key={t} onClick={() => setType(t)} style={{ flex: 1, padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: type === t ? (t === 'ingreso' ? 'rgba(74,222,128,.2)' : 'rgba(248,113,113,.2)') : '#1a1a2e', color: type === t ? (t === 'ingreso' ? C.green : C.red) : C.muted }}>
+              {t === 'ingreso' ? '↑ Ingreso' : '↓ Egreso'}
+            </button>
+          ))}
+        </div>
 
-        {step === 'audio' && (
-          <>
-            <div style={{ fontWeight: 700, fontSize: '18px', color: C.text, marginBottom: '8px', textAlign: 'center' }}>Registrar por voz</div>
-            <div style={{ fontSize: '13px', color: C.muted, textAlign: 'center', marginBottom: '28px' }}>Di algo como: "Gasté 50 mil en comida" o "Cobré 200 mil por consultoría"</div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', marginBottom: '24px' }}>
-              <button onClick={recording ? stopRecording : startSpeechRecognition} style={{ width: '100px', height: '100px', borderRadius: '50%', border: 'none', background: recording ? C.red : 'linear-gradient(135deg,#8b7ff0,#6a8af0)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: recording ? `0 0 30px ${C.red}66` : '0 0 30px rgba(139,127,240,.5)', transition: 'all .2s' }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="white"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              </button>
-              {audioFb && <div style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '12px', padding: '12px 16px', fontSize: '13px', color: C.purple, textAlign: 'center', width: '100%' }}>{audioFb}</div>}
-            </div>
-            <button onClick={() => setStep('menu')} style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.muted, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>← Volver</button>
-          </>
-        )}
+        <label style={lbl}>Descripción</label>
+        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Comida, Arriendo, Consultoría..." style={inp} />
 
-        {step === 'form' && (
-          <>
-            <div style={{ fontWeight: 700, fontSize: '18px', color: C.text, marginBottom: '16px' }}>Nueva transacción</div>
-            {audioFb && <div style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12px', color: C.purple, marginBottom: '14px' }}>{audioFb}</div>}
+        <label style={lbl}>Categoría</label>
+        <select value={selectedCat} onChange={e => setSelectedCat(e.target.value)} style={{ ...sel, marginBottom: '14px', width: '100%', fontSize: '15px' }}>
+          <option value="">Sin categoría</option>
+          {spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </select>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-              <div>
-                <label style={lbl}>Tipo</label>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {(['egreso', 'ingreso'] as TxType[]).map(t => (
-                    <button key={t} onClick={() => setType(t)} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: type === t ? (t === 'ingreso' ? 'rgba(74,222,128,.2)' : 'rgba(248,113,113,.2)') : '#1a1a2e', color: type === t ? (t === 'ingreso' ? C.green : C.red) : C.muted }}>
-                      {t === 'ingreso' ? '↑ Ingreso' : '↓ Egreso'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={lbl}>Fecha</label>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, padding: '10px 12px', fontSize: '13px' }} />
-              </div>
-            </div>
+        <label style={lbl}>Monto</label>
+        <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, fontSize: '28px', fontWeight: 700, textAlign: 'center' }} />
 
-            <label style={lbl}>Descripción</label>
-            <input value={desc} onChange={e => { setDesc(e.target.value); setCatSuggestion(null) }} placeholder="Ej: Comida, Arriendo, Consultoría..." style={inp} />
-
-            {(catSuggestion || sugLoading) && (
-              <div style={{ marginTop: '-8px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {sugLoading ? <span style={{ fontSize: '12px', color: C.muted }}>✨ Analizando categoría...</span> : catSuggestion ? <>
-                  <span style={{ fontSize: '12px', color: C.muted }}>✨ Sugerida:</span>
-                  <button onClick={() => setSelectedCat(catSuggestion)} style={{ padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: `1px solid ${selectedCat === catSuggestion ? C.primary : 'rgba(139,127,240,.4)'}`, background: selectedCat === catSuggestion ? 'rgba(139,127,240,.2)' : 'transparent', color: C.purple, fontFamily: 'inherit' }}>{catSuggestion} {selectedCat === catSuggestion ? '✓' : ''}</button>
-                </> : null}
-              </div>
-            )}
-
-            <label style={lbl}>Categoría</label>
-            <select value={selectedCat} onChange={e => setSelectedCat(e.target.value)} style={{ ...sel, marginBottom: '14px', width: '100%', fontSize: '15px' }}>
-              <option value="">Sin categoría</option>
-              {spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-
-            <label style={lbl}>Monto</label>
-            <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, fontSize: '24px', fontWeight: 700, textAlign: 'center' }} />
-
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+          <div>
+            <label style={lbl}>Fecha</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, fontSize: '13px' }} />
+          </div>
+          <div>
             <label style={lbl}>Forma de pago</label>
-            <select value={pm} onChange={e => setPm(e.target.value)} style={{ ...sel, marginBottom: '20px', width: '100%', fontSize: '15px' }}>
+            <select value={pm} onChange={e => setPm(e.target.value)} style={{ ...sel, width: '100%', fontSize: '13px' }}>
               {pms.map(p => <option key={p.id}>{p.name}</option>)}
             </select>
+          </div>
+        </div>
 
-            <button onClick={save} disabled={saving || !desc || !amount} style={{ ...btnStyle, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', opacity: (saving || !desc || !amount) ? 0.5 : 1, marginBottom: '10px' }}>{saving ? 'Guardando...' : 'Guardar'}</button>
-            <button onClick={() => setStep('menu')} style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.muted, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>← Volver</button>
-          </>
-        )}
+        <button onClick={save} disabled={saving || !desc || !amount} style={{ ...btnStyle, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', opacity: (saving || !desc || !amount) ? 0.5 : 1, marginBottom: '10px' }}>{saving ? 'Guardando...' : 'Guardar'}</button>
+        <button onClick={onClose} style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.muted, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
       </div>
     </div>
   )
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
+
 function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx; pms: PM[]; space: Space; cats: Cat[]; onSave: (data: any) => Promise<void>; onDelete: () => Promise<void>; onClose: () => void }) {
   const [type, setType] = useState<TxType>(tx.type)
   const [date, setDate] = useState(tx.date)
@@ -445,6 +297,21 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function BudgetCustomRowMobile({ onSave }: { onSave: (name: string, amt: number) => void }) {
+  const [name, setName] = useState('')
+  const [val, setVal] = useState('')
+  const [saving, setSaving] = useState(false)
+  return (
+    <div style={{ background: '#12121e', borderRadius: '12px', border: '1px solid #252535', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre..." style={{ flex: 1, minWidth: '100px', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '8px', padding: '8px 10px', color: '#e8e8f0', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+      <input type="number" inputMode="numeric" value={val} onChange={e => setVal(e.target.value)} placeholder="Límite" style={{ width: '90px', background: '#1a1a2e', border: '1px solid #252535', borderRadius: '8px', padding: '8px 10px', color: '#e8e8f0', fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+      <button onClick={async () => { if (!name.trim() || !val || Number(val) <= 0) return; setSaving(true); await onSave(name.trim(), Number(val)); setName(''); setVal(''); setSaving(false) }} disabled={saving} style={{ padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+        {saving ? '...' : '+ Agregar'}
+      </button>
     </div>
   )
 }
@@ -661,22 +528,20 @@ function MainApp() {
 
   // ── BOTTOM NAV ──
   const navItems = [
-    { id: 'inicio', l: 'Inicio', d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
-    { id: 'movimientos', l: 'Movimientos', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
+    { id: 'inicio', l: 'Inicio', d: 'inicio' },
+    { id: 'movimientos', l: 'Movs.', d: 'movimientos' },
     { id: '__add__', l: '', d: '' },
-    { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
-    { id: 'ajustes', l: 'Ajustes', d: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' },
+    { id: 'reportes', l: 'Reportes', d: 'reportes' },
+    { id: 'ajustes', l: 'Ajustes', d: 'ajustes' },
   ]
 
   return (
     <div style={{ background: C.bg, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark', maxWidth: '500px', margin: '0 auto', position: 'relative' }}>
 
       {/* TOP BAR */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: C.sbg, borderBottom: `1px solid ${C.border}`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 50, background: C.sbg, borderBottom: `1px solid ${C.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          </div>
+          <img src="/icon-192.png" style={{ width: '32px', height: '32px', borderRadius: '9px' }} alt="Clarix" />
           <div>
             <div style={{ fontWeight: 700, fontSize: '14px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
             <div style={{ fontSize: '10px', color: C.sub }}>
@@ -684,18 +549,9 @@ function MainApp() {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', background: '#18182a', borderRadius: '8px', padding: '2px', border: '1px solid #2a2a3e' }}>
-            {(['personal', 'empresa'] as Space[]).map(s => (
-              <button key={s} onClick={() => setSpace(s)} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: space === s ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : 'transparent', color: space === s ? '#fff' : '#7070b0' }}>
-                {s === 'personal' ? 'Personal' : 'Empresa'}
-              </button>
-            ))}
-          </div>
-          <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '5px 8px', color: C.text, fontSize: '11px', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
-            {MONTHS.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
-          </select>
-        </div>
+        <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '5px 8px', color: C.text, fontSize: '11px', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
+          {MONTHS.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
+        </select>
       </div>
 
       {/* CONTENT */}
@@ -708,7 +564,7 @@ function MainApp() {
             <div style={pageStyle}>
               {!isPro && (
                 <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '14px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra, usa audio e IA</div></div>
+                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra movimientos y mucho más</div></div>
                   <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
                 </div>
               )}
@@ -934,6 +790,72 @@ function MainApp() {
             </div>
           )}
 
+          {/* PRESUPUESTO */}
+          {page === 'presupuesto' && (() => {
+            const spaceCats2 = cats.filter(c => (c.space === space || c.space === 'ambos') && c.type !== 'ingreso')
+            const withBudget = spaceCats2.map(c => {
+              const budget = budgets.find(b => b.category_name === c.name)
+              const spent = txMonth.filter(t => t.type === 'egreso' && t.category_name === c.name).reduce((s, t) => s + t.amount, 0)
+              const limit = budget?.limit_amount || 0
+              const pct = limit > 0 ? Math.min(100, Math.round(spent / limit * 100)) : 0
+              return { ...c, spent, limit, pct, warning: pct >= 80 && pct < 100, over: pct >= 100, budgetId: budget?.id }
+            }).filter(c => c.limit > 0)
+            const withoutBudget = spaceCats2.filter(c => !budgets.find(b => b.category_name === c.name))
+            return (
+              <div style={{ padding: '16px', paddingBottom: '120px' }}>
+                <div style={{ fontWeight: 700, fontSize: '20px', color: C.text, marginBottom: '4px' }}>Presupuesto</div>
+                <div style={{ fontSize: '12px', color: C.sub, marginBottom: '16px' }}>{MONTHS[month]} {year}</div>
+
+                {withBudget.length === 0 && (
+                  <div style={{ ...card, padding: '28px', textAlign: 'center', marginBottom: '16px' }}>
+                    <div style={{ fontSize: '32px', marginBottom: '10px' }}>💰</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: C.text, marginBottom: '4px' }}>Sin límites configurados</div>
+                    <div style={{ fontSize: '12px', color: C.muted }}>Agrega un límite a tus categorías</div>
+                  </div>
+                )}
+
+                {withBudget.map((c, i) => (
+                  <div key={i} style={{ ...card, padding: '14px 16px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color }} />
+                        <span style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{c.name}</span>
+                        {c.warning && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(251,191,36,.15)', color: '#fbbf24', fontWeight: 600 }}>⚠ 80%+</span>}
+                        {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmtM(c.spent)} / {fmtM(c.limit)}</span>
+                        <button onClick={() => c.budgetId && deleteBudget(c.budgetId)} style={{ width: '20px', height: '20px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>×</button>
+                      </div>
+                    </div>
+                    <div style={{ background: '#1a1a2e', height: '8px', borderRadius: '99px', overflow: 'hidden', marginBottom: '4px' }}>
+                      <div style={{ height: '100%', width: `${c.pct}%`, background: c.over ? C.red : c.warning ? '#fbbf24' : c.color, borderRadius: '99px', transition: 'width .3s' }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{c.pct}% utilizado</div>
+                  </div>
+                ))}
+
+                <div style={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '10px', marginTop: '8px' }}>
+                  {withBudget.length > 0 ? 'Agregar más categorías' : 'Tus categorías de gasto'}
+                </div>
+                {withoutBudget.map((c, i) => {
+                  const [val, setVal] = useState('')
+                  return (
+                    <div key={i} style={{ ...card, padding: '12px 14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', flex: 1, color: '#c0c0e0' }}>{c.name}</span>
+                      <input type="number" inputMode="numeric" value={val} onChange={e => setVal(e.target.value)} placeholder="Límite" style={{ width: '90px', background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '7px 8px', color: C.text, fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+                      <button onClick={async () => { if (!val || Number(val) <= 0) return; await upsertBudget(c.name, Number(val)); setVal('') }} style={{ padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit' }}>+</button>
+                    </div>
+                  )
+                })}
+
+                <div style={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '8px', marginTop: '14px' }}>Categoría personalizada</div>
+                <BudgetCustomRowMobile onSave={(name, amt) => upsertBudget(name, amt)} />
+              </div>
+            )
+          })()}
+
           {/* AJUSTES */}
           {page === 'ajustes' && (
             <div style={pageStyle}>
@@ -953,11 +875,12 @@ function MainApp() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {[
                     { id: 'perfil', l: 'Perfil', d: `${user?.email} · Plan ${isPro ? 'Pro ⚡' : 'Free'}`, ic: '👤' },
+                    { id: 'presupuesto', l: 'Presupuesto', d: 'Límites por categoría', ic: '💰' },
                     { id: 'categorias', l: 'Categorías', d: `${spaceCats.length} categorías`, ic: '🏷' },
                     { id: 'pagos', l: 'Métodos de pago', d: `${pms.length} métodos`, ic: '💳' },
                     ...(isAdmin ? [{ id: 'admin', l: 'Panel Admin', d: 'Gestión de usuarios', ic: '👑' }] : []),
                   ].map(item => (
-                    <div key={item.id} onClick={() => item.id === 'admin' ? setPage('admin') : setAdjSub(item.id)} style={{ ...card, padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}>
+                    <div key={item.id} onClick={() => ['admin','presupuesto'].includes(item.id) ? setPage(item.id) : setAdjSub(item.id)} style={{ ...card, padding: '16px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}>
                       <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{item.ic}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '15px', fontWeight: 500, color: C.text }}>{item.l}</div>
@@ -1042,26 +965,40 @@ function MainApp() {
       )}
 
       {/* BOTTOM NAV */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '500px', background: C.sbg, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '8px 0 max(8px, env(safe-area-inset-bottom))', zIndex: 50 }}>
-        {navItems.map((item, i) => {
-          if (item.id === '__add__') return (
-            <button key="add" onClick={() => isPro ? setShowRegister(true) : setShowUpgrade(true)} style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(139,127,240,.5)', marginTop: '-16px' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
-            </button>
-          )
-          const active = page === item.id
-          return (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 14px', fontFamily: 'inherit' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? C.primary : '#6060a0'} strokeWidth="2">
-                {item.id === 'inicio' && <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>}
-                {item.id === 'movimientos' && <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>}
-                {item.id === 'reportes' && <path d="M18 20V10M12 20V4M6 20v-6"/>}
-                {item.id === 'ajustes' && <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>}
-              </svg>
-              <span style={{ fontSize: '10px', color: active ? C.primary : '#6060a0', fontWeight: active ? 600 : 400 }}>{item.l}</span>
-            </button>
-          )
-        })}
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '500px', background: C.sbg, borderTop: `1px solid ${C.border}`, zIndex: 50 }}>
+        {/* Space toggle */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, padding: '6px 16px 4px' }}>
+          <div style={{ display: 'flex', background: '#18182a', borderRadius: '8px', padding: '2px', border: '1px solid #2a2a3e', width: '100%' }}>
+            {(['personal', 'empresa'] as Space[]).map(s => (
+              <button key={s} onClick={() => setSpace(s)} style={{ flex: 1, padding: '5px 0', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: space === s ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : 'transparent', color: space === s ? '#fff' : '#7070b0' }}>
+                {s === 'personal' ? '👤 Personal' : '🏢 Empresa'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Nav items */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '6px 0 max(10px, env(safe-area-inset-bottom))' }}>
+          {[
+            { id: 'inicio', l: 'Inicio', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+            { id: 'movimientos', l: 'Movs.', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
+            { id: '__add__', l: '', icon: null },
+            { id: 'reportes', l: 'Reportes', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg> },
+            { id: 'ajustes', l: 'Ajustes', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
+          ].map(item => {
+            if (item.id === '__add__') return (
+              <button key="add" onClick={() => isPro ? setShowRegister(true) : setShowUpgrade(true)} style={{ width: '50px', height: '50px', borderRadius: '16px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(139,127,240,.5)', marginTop: '-20px' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            )
+            const active = page === item.id
+            return (
+              <button key={item.id} onClick={() => setPage(item.id)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 12px', fontFamily: 'inherit', color: active ? C.primary : '#6060a0' }}>
+                {item.icon}
+                <span style={{ fontSize: '10px', fontWeight: active ? 600 : 400 }}>{item.l}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {showRegister && <RegisterModal pms={pms} space={space} cats={cats} onAdd={addTx} onClose={() => setShowRegister(false)} />}
