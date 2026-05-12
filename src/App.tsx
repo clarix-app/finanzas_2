@@ -82,9 +82,7 @@ function LoginPage({ onReg }: { onReg: () => void }) {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(139,127,240,.4)' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-          </div>
+          <img src="/icon-192.png" style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Clarix" />
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
           <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Inicia sesión para continuar</p>
         </div>
@@ -132,9 +130,7 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(139,127,240,.4)' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-          </div>
+          <img src="/icon-192.png" style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Clarix" />
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
           <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Crea tu cuenta gratis</p>
         </div>
@@ -858,11 +854,13 @@ function MainApp() {
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: C.bg, fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark' }}>
       <div style={{ width: '200px', flexShrink: 0, background: C.sbg, borderRight: `1px solid #1e1e2e`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid #1e1e2e' }}>
-          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px', boxShadow: '0 0 14px rgba(139,127,240,.35)' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <img src="/icon-192.png" style={{ width: '30px', height: '30px', borderRadius: '8px' }} alt="Clarix" />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
+              <div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>Planeación financiera</div>
+            </div>
           </div>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
-          <div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>Planeación financiera</div>
         </div>
         <div style={{ margin: '8px 10px 4px', background: '#18182a', borderRadius: '8px', padding: '3px', display: 'flex', border: '1px solid #2a2a3e' }}>
           {(['personal', 'empresa'] as Space[]).map(s => (
@@ -2230,9 +2228,7 @@ function AppRoot() {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-        </div>
+        <img src="/icon-192.png" style={{ width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 14px', display: 'block' }} alt="Clarix" />
         <div style={{ color: '#6060a0', fontSize: '13px' }}>Cargando Clarix...</div>
       </div>
     </div>
