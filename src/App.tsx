@@ -1618,7 +1618,111 @@ function MobileApp() {
           {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: C.muted }}>Cargando...</div> : (
             <div style={{ padding: '20px' }}>
               {page === 'admin' && isAdmin && <MobileAdminPage />}
-              {page !== 'admin' && <></>}
+              {page !== 'admin' && (
+                <div style={{ padding: '0' }}>
+                  <div style={{ flex: 1, overflowY: 'auto', background: C.bg }}>
+                    {loading ? null : (
+                      <div>
+                        {(page === 'inicio' || page === 'dashboard') && <>
+                          {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
+                          {!isPro && (
+                            <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos y mucho más</div></div>
+                              <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
+                            </div>
+                          )}
+                          <div style={{ ...card, padding: '16px 18px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '15px', color: C.text }}>{greet}, {userName} 👋</div>
+                              <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{isEmp ? 'Tu negocio va por buen camino' : 'Tus finanzas están bajo control'}</div>
+                              {gami && <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '7px', fontSize: '11px', color: '#fbbf24' }}><div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fbbf24' }} />{gami.streak_days} días de racha 🔥</div>}
+                            </div>
+                            {gami && <div style={{ textAlign: 'right', minWidth: '140px' }}>
+                              <div style={{ fontSize: '10px', color: C.muted, marginBottom: '5px' }}>Nivel {gami.level} · {500 - (gami.xp % 500)} XP para nivel {gami.level + 1}</div>
+                              <div style={{ width: '130px', height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden', marginLeft: 'auto' }}><div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg,#8b7ff0,#6a8af0)', borderRadius: '99px' }} /></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: C.muted, marginTop: '3px', width: '130px', marginLeft: 'auto' }}><span>{gami.xp} XP</span><span>{Math.round(xpPct)}%</span></div>
+                            </div>}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '12px' }}>
+                            {[{ l: 'Ingresos', v: ing, c: C.purple }, { l: isEmp ? 'Egresos' : 'Gastos', v: eg, c: C.red }, { l: isEmp ? 'Utilidad' : 'Ahorro', v: util, c: C.green }].map((k, i) => (
+                              <div key={i} style={{ ...card, padding: '13px 15px' }}>
+                                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{fmt(k.v)}</div>
+                                <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{MONTHS[month]} {year}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ ...card, padding: '14px', marginBottom: '12px' }}>
+                            <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '12px' }}>Gastos por categoría</div>
+                            <DonutChart items={groupByCat('egreso')} total={eg} />
+                          </div>
+                          <div style={{ ...card, padding: '14px' }}>
+                            <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Últimos movimientos</div>
+                            {txMonth.length === 0 ? <div style={{ textAlign: 'center', padding: '20px', color: C.muted, fontSize: '12px' }}>No hay movimientos este mes</div> :
+                              txMonth.slice(0, 5).map(t => (
+                                <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)', cursor: 'pointer' }}>
+                                  <div><div style={{ fontSize: '12px', color: '#c0c0e0' }}>{t.description}</div><div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{t.date} · {t.category_name || t.payment_method || '—'}</div></div>
+                                  <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</div>
+                                </div>
+                              ))}
+                          </div>
+                        </>}
+                        {page === 'presupuesto' && (() => {
+                          const egressCats = spaceCats.filter(c => c.type !== 'ingreso')
+                          const allCatsWithBudget = egressCats.map(c => {
+                            const budget = budgets.find(b => b.category_name === c.name)
+                            const spent = txMonth.filter(t => t.type === 'egreso' && t.category_name === c.name).reduce((s, t) => s + t.amount, 0)
+                            const limit = budget?.limit_amount || 0
+                            const pct = limit > 0 ? Math.min(100, Math.round(spent / limit * 100)) : 0
+                            const warning = pct >= 80 && pct < 100
+                            const over = pct >= 100
+                            return { ...c, spent, limit, pct, warning, over, budgetId: budget?.id }
+                          })
+                          const withBudget = allCatsWithBudget.filter(c => c.limit > 0)
+                          const withoutBudget = allCatsWithBudget.filter(c => c.limit === 0)
+                          return <>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+                              <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Presupuesto</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>{isEmp ? 'Empresa' : 'Personal'} · {MONTHS[month]} {year}</div></div>
+                              <select value={month} onChange={e => setMonth(Number(e.target.value))} style={{ ...sel, padding: '6px 10px', width: 'auto' }}>{MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}</select>
+                            </div>
+                            {withBudget.length === 0 && <div style={{ ...card, padding: '24px', textAlign: 'center', marginBottom: '14px' }}><div style={{ fontSize: '28px', marginBottom: '8px' }}>💰</div><div style={{ fontSize: '13px', fontWeight: 500, color: C.text, marginBottom: '4px' }}>Sin límites configurados</div><div style={{ fontSize: '11px', color: C.muted }}>Agrega un límite a tus categorías</div></div>}
+                            {withBudget.map((c, i) => (
+                              <div key={i} style={{ ...card, padding: '14px 16px', marginBottom: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color }} />
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: C.text }}>{c.name}</span>
+                                    {c.warning && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(251,191,36,.15)', color: '#fbbf24', fontWeight: 600 }}>⚠ 80%+</span>}
+                                    {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmt(c.spent)} / {fmt(c.limit)}</span>
+                                    <button onClick={() => c.budgetId && deleteBudget(c.budgetId)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>×</button>
+                                  </div>
+                                </div>
+                                <div style={{ background: '#1a1a2e', height: '8px', borderRadius: '99px', overflow: 'hidden', marginBottom: '5px' }}>
+                                  <div style={{ height: '100%', width: `${c.pct}%`, background: c.over ? C.red : c.warning ? '#fbbf24' : c.color, borderRadius: '99px', transition: 'width .3s' }} />
+                                </div>
+                                <div style={{ fontSize: '10px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{c.pct}% utilizado{c.over ? ' · Límite superado' : c.warning ? ' · Casi al límite' : ''}</div>
+                              </div>
+                            ))}
+                            <div style={{ marginTop: '6px' }}>
+                              <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>{withBudget.length > 0 ? 'Agregar límite a más categorías' : 'Tus categorías de gasto'}</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {withoutBudget.map((c, i) => <BudgetRow key={i} cat={c} onSave={(amt) => upsertBudget(c.name, amt)} />)}
+                              </div>
+                              <div style={{ marginTop: '12px' }}>
+                                <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '8px' }}>O agrega una categoría personalizada</div>
+                                <BudgetCustomRow onSave={(name, amt) => upsertBudget(name, amt)} />
+                              </div>
+                            </div>
+                          </>
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
