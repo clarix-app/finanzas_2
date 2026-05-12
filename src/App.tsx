@@ -1250,6 +1250,18 @@ function BudgetCustomRowMobile({ onSave }: { onSave: (name: string, amt: number)
   )
 }
 
+function BudgetCatRow({ cat, onSave, C, card }: { cat: any; onSave: (amt: number) => void; C: any; card: any }) {
+  const [val, setVal] = useState('')
+  return (
+    <div style={{ ...card, padding: '12px 14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
+      <span style={{ fontSize: '13px', flex: 1, color: '#c0c0e0' }}>{cat.name}</span>
+      <input type="number" value={val} onChange={e => setVal(e.target.value)} placeholder="Límite" style={{ width: '100px', background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '7px 8px', color: C.text, fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
+      <button onClick={async () => { if (!val || Number(val) <= 0) return; await onSave(Number(val)); setVal('') }} style={{ padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit' }}>+</button>
+    </div>
+  )
+}
+
 // ── ADMIN PAGE ────────────────────────────────────────────────────────────────
 function MobileAdminPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -1857,17 +1869,9 @@ function MobileApp() {
                 <div style={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '10px', marginTop: '8px' }}>
                   {withBudget.length > 0 ? 'Agregar más categorías' : 'Tus categorías de gasto'}
                 </div>
-                {withoutBudget.map((c, i) => {
-                  const [val, setVal] = useState('')
-                  return (
-                    <div key={i} style={{ ...card, padding: '12px 14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: '13px', flex: 1, color: '#c0c0e0' }}>{c.name}</span>
-                      <input type="number" inputMode="numeric" value={val} onChange={e => setVal(e.target.value)} placeholder="Límite" style={{ width: '90px', background: '#1a1a2e', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '7px 8px', color: C.text, fontSize: '13px', outline: 'none', fontFamily: 'inherit' }} />
-                      <button onClick={async () => { if (!val || Number(val) <= 0) return; await upsertBudget(c.name, Number(val)); setVal('') }} style={{ padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', fontFamily: 'inherit' }}>+</button>
-                    </div>
-                  )
-                })}
+                {withoutBudget.map((c, i) => (
+                  <BudgetCatRow key={i} cat={c} onSave={(amt) => upsertBudget(c.name, amt)} C={C} card={card} />
+                ))}
 
                 <div style={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '8px', marginTop: '14px' }}>Categoría personalizada</div>
                 <BudgetCustomRowMobile onSave={(name, amt) => upsertBudget(name, amt)} />
