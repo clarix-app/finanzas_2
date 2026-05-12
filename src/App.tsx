@@ -298,6 +298,70 @@ function Modal({ pms, space, onAdd, onClose, cats }: { pms: PM[]; space: Space; 
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
+function RegisterModal({ pms, space, cats, onAdd, onClose }: { pms: PM[]; space: Space; cats: Cat[]; onAdd: (tx: any) => Promise<void>; onClose: () => void }) {
+  const [type, setType] = useState<TxType>('egreso')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [desc, setDesc] = useState('')
+  const [amount, setAmount] = useState('')
+  const [pm, setPm] = useState(pms[0]?.name || '')
+  const [selectedCat, setSelectedCat] = useState('')
+  const [saving, setSaving] = useState(false)
+  const spaceCats = cats.filter(c => c.space === space || c.space === 'ambos')
+
+  const save = async () => {
+    if (!desc || !amount) return
+    setSaving(true)
+    await onAdd({ space, date, type, description: desc, amount: Number(amount), payment_method: pm, category_name: selectedCat || undefined })
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '24px 24px 0 0', padding: '20px 20px 40px', width: '100%', maxWidth: '500px', maxHeight: '92vh', overflowY: 'auto', fontFamily: "'DM Sans', sans-serif" }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: '40px', height: '4px', background: '#2a2a3e', borderRadius: '99px', margin: '0 auto 20px' }} />
+        <div style={{ fontWeight: 700, fontSize: '18px', color: C.text, marginBottom: '16px' }}>Nueva transacción</div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {(['egreso', 'ingreso'] as TxType[]).map(t => (
+            <button key={t} onClick={() => setType(t)} style={{ flex: 1, padding: '12px', borderRadius: '12px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', border: 'none', fontFamily: 'inherit', background: type === t ? (t === 'ingreso' ? 'rgba(74,222,128,.2)' : 'rgba(248,113,113,.2)') : '#1a1a2e', color: type === t ? (t === 'ingreso' ? C.green : C.red) : C.muted }}>
+              {t === 'ingreso' ? '↑ Ingreso' : '↓ Egreso'}
+            </button>
+          ))}
+        </div>
+
+        <label style={lbl}>Descripción</label>
+        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Ej: Comida, Arriendo, Consultoría..." style={inp} />
+
+        <label style={lbl}>Categoría</label>
+        <select value={selectedCat} onChange={e => setSelectedCat(e.target.value)} style={{ ...sel, marginBottom: '14px', width: '100%', fontSize: '15px' }}>
+          <option value="">Sin categoría</option>
+          {spaceCats.filter(c => type === 'ingreso' ? c.type === 'ingreso' : c.type !== 'ingreso').map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </select>
+
+        <label style={lbl}>Monto</label>
+        <input type="number" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" style={{ ...inp, fontSize: '28px', fontWeight: 700, textAlign: 'center' }} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+          <div>
+            <label style={lbl}>Fecha</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inp, marginBottom: 0, fontSize: '13px' }} />
+          </div>
+          <div>
+            <label style={lbl}>Forma de pago</label>
+            <select value={pm} onChange={e => setPm(e.target.value)} style={{ ...sel, width: '100%', fontSize: '13px' }}>
+              {pms.map(p => <option key={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving || !desc || !amount} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', opacity: (saving || !desc || !amount) ? 0.5 : 1, marginBottom: '10px' }}>{saving ? 'Guardando...' : 'Guardar'}</button>
+        <button onClick={onClose} style={{ width: '100%', padding: '14px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '12px', color: C.muted, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx; pms: PM[]; space: Space; cats: Cat[]; onSave: (data: any) => Promise<void>; onDelete: () => Promise<void>; onClose: () => void }) {
   const [type, setType] = useState<TxType>(tx.type)
   const [date, setDate] = useState(tx.date)
@@ -1325,7 +1389,7 @@ function MobileAdminPage() {
             </div>
           ))}
       </div>
-      <button onClick={loadUsers} style={{ ...btnStyle, width: '100%', marginTop: '14px', padding: '12px', fontSize: '13px' }}>↻ Actualizar</button>
+      <button onClick={loadUsers} style={{ ...btn, width: '100%', marginTop: '14px', padding: '12px', fontSize: '13px' }}>↻ Actualizar</button>
     </div>
   )
 }
