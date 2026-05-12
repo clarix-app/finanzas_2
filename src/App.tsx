@@ -692,7 +692,15 @@ function MainApp() {
   }
 
   async function upsertBudget(category_name: string, limit_amount: number) {
-    const { data } = await supabase.from('budgets').upsert({ user_id: user!.id, space, category_name, limit_amount }, { onConflict: 'user_id,space,category_name' }).select().single()
+    const existing = await supabase.from('budgets').select('id').eq('user_id', user!.id).eq('space', space).eq('category_name', category_name).single()
+    let data
+    if (existing.data?.id) {
+      const res = await supabase.from('budgets').update({ limit_amount }).eq('id', existing.data.id).select().single()
+      data = res.data
+    } else {
+      const res = await supabase.from('budgets').insert({ user_id: user!.id, space, category_name, limit_amount }).select().single()
+      data = res.data
+    }
     if (data) setBudgets(prev => { const exists = prev.find(b => b.category_name === category_name); return exists ? prev.map(b => b.category_name === category_name ? data : b) : [...prev, data] })
   }
 
@@ -1464,7 +1472,15 @@ function MobileApp() {
   }
 
   async function upsertBudget(category_name: string, limit_amount: number) {
-    const { data } = await supabase.from('budgets').upsert({ user_id: user!.id, space, category_name, limit_amount }, { onConflict: 'user_id,space,category_name' }).select().single()
+    const existing = await supabase.from('budgets').select('id').eq('user_id', user!.id).eq('space', space).eq('category_name', category_name).single()
+    let data
+    if (existing.data?.id) {
+      const res = await supabase.from('budgets').update({ limit_amount }).eq('id', existing.data.id).select().single()
+      data = res.data
+    } else {
+      const res = await supabase.from('budgets').insert({ user_id: user!.id, space, category_name, limit_amount }).select().single()
+      data = res.data
+    }
     if (data) setBudgets(prev => { const exists = prev.find(b => b.category_name === category_name); return exists ? prev.map(b => b.category_name === category_name ? data : b) : [...prev, data] })
   }
 
