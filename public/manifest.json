@@ -1,15 +1,24 @@
 {
-  "name": "Fluxyy — Planeación Financiera",
+  "name": "Fluxyy",
   "short_name": "Fluxyy",
-  "description": "Tu copiloto financiero personal",
+  "description": "Tu app de finanzas personales y de negocio",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d0d14",
-  "theme_color": "#8b7ff0",
+  "theme_color": "#0d0d14",
   "orientation": "portrait",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ],
-  "categories": ["finance", "productivity"]
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }
