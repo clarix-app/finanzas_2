@@ -2180,7 +2180,7 @@ export default function App() {
   )
 }
 
-function OnboardingPage({ onDone }: { onDone: (currency: string, space: string) => void }) {
+function OnboardingPage({ onDone }: { onDone: (currency: string, cats: {name: string; color: string}[]) => void }) {
   const { user } = useAuth()
   const [step, setStep] = useState(0)
   const [currency, setCurrency] = useState('COP')
@@ -2257,14 +2257,7 @@ function OnboardingPage({ onDone }: { onDone: (currency: string, space: string) 
       </div>
       <div style={{ fontSize: '12px', color: C.muted, textAlign: 'center', margin: '10px 0 4px' }}>{selectedCats.length} categorías seleccionadas</div>
       <button onClick={async () => {
-        if (!user || savingCats) return
         setSavingCats(true)
-        const inserts = selectedCats.map(name => {
-          const cat = PRESET_CATS.find(c => c.name === name)
-          return { user_id: user.id, space: 'personal', type: 'egreso', name, color: cat?.color || '#6060a0', is_default: false }
-        })
-        inserts.push({ user_id: user.id, space: 'personal', type: 'ingreso', name: 'Ingresos', color: '#a89ef5', is_default: true })
-        await supabase.from('categories').upsert(inserts, { onConflict: 'user_id,space,name' })
         setSavingCats(false)
         setStep(3)
       }} disabled={savingCats || selectedCats.length === 0} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '8px', opacity: (savingCats || selectedCats.length === 0) ? 0.6 : 1 }}>
@@ -2287,7 +2280,13 @@ function OnboardingPage({ onDone }: { onDone: (currency: string, space: string) 
           </div>
         ))}
       </div>
-      <button onClick={() => onDone(currency, space)} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '24px' }}>¡Empezar! 🚀</button>
+      <button onClick={() => {
+          const catsWithColors = selectedCats.map(name => {
+            const cat = PRESET_CATS.find(c => c.name === name)
+            return { name, color: cat?.color || '#6060a0' }
+          })
+          onDone(currency, catsWithColors)
+        }} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '24px' }}>¡Empezar! 🚀</button>
     </div>
   ]
 
@@ -2311,23 +2310,32 @@ function AppRoot() {
   const { user, loading } = useAuth()
   const [view, setView] = useState<'login' | 'register'>('login')
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true)
 
   useEffect(() => {
     if (user) {
-      const done = localStorage.getItem(`onboarding_${user.id}`)
-      if (!done) setShowOnboarding(true)
+      supabase.from('profiles').select('onboarding_done').eq('id', user.id).single().then(({ data }) => {
+        if (!data?.onboarding_done) setShowOnboarding(true)
+        setCheckingOnboarding(false)
+      })
+    } else {
+      setCheckingOnboarding(false)
     }
   }, [user])
 
-  const finishOnboarding = async (currency: string, space: string) => {
+  const finishOnboarding = async (currency: string, selectedCats: {name: string; color: string}[]) => {
     if (user) {
-      await supabase.from('profiles').update({ currency }).eq('id', user.id)
-      localStorage.setItem(`onboarding_${user.id}`, 'done')
+      await supabase.from('profiles').update({ currency, onboarding_done: true }).eq('id', user.id)
+      if (selectedCats.length > 0) {
+        const inserts = selectedCats.map(c => ({ user_id: user.id, space: 'personal', type: 'egreso', name: c.name, color: c.color, is_default: false }))
+        inserts.push({ user_id: user.id, space: 'personal', type: 'ingreso', name: 'Ingresos', color: '#a89ef5', is_default: true })
+        await supabase.from('categories').upsert(inserts, { onConflict: 'user_id,space,name' })
+      }
     }
     setShowOnboarding(false)
   }
 
-  if (loading) return (
+  if (loading || checkingOnboarding) return (
     <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center' }}>
         <img src={LOGO} style={{ width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 14px', display: 'block' }} alt="Fluxyy" />
