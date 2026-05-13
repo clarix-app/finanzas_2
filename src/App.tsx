@@ -15,7 +15,7 @@ interface Cat { id: string; user_id: string; space: string; type: string; name: 
 interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
 interface Budget { id: string; user_id: string; space: Space; category_name: string; limit_amount: number }
-interface Profile { id: string; name: string; email: string; plan: string }
+interface Profile { id: string; name: string; email: string; plan: string; currency: string }
 interface AdminUser { id: string; email: string; name: string; plan: string; created_at: string; total_movimientos: number; ultimo_movimiento: string | null }
 
 const ADMIN_EMAIL = 'fpadillav1@gmail.com'
@@ -23,6 +23,14 @@ const ADMIN_EMAIL = 'fpadillav1@gmail.com'
 const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
 const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  COP: '$', USD: '$', CLP: '$', MXN: '$', PEN: 'S/'
+}
+const CURRENCY_LOCALES: Record<string, string> = {
+  COP: 'es-CO', USD: 'en-US', CLP: 'es-CL', MXN: 'es-MX', PEN: 'es-PE'
+}
 
 const C = {
   bg: '#0d0d14', sbg: '#0f0f18', card: '#12121e', border: '#252535',
@@ -534,6 +542,7 @@ function MainApp() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [adjSub, setAdjSub] = useState('')
+  const [currency, setCurrency] = useState('COP')
   const [newCat, setNewCat] = useState('')
   const [newCatType, setNewCatType] = useState('ingreso')
   const [newPM, setNewPM] = useState('')
@@ -560,7 +569,7 @@ function MainApp() {
     if (p.data) setPms(p.data)
     if (g.data) setGami(g.data)
     if (b.data) setBudgets(b.data)
-    if (pr.data) setProfile(pr.data)
+    if (pr.data) { setProfile(pr.data); setCurrency(pr.data.currency || 'COP') }
     setLoading(false)
   }
 
@@ -1128,7 +1137,13 @@ function MainApp() {
                     <label style={lbl}>Email</label>
                     <div style={{ background: '#0f0f1a', border: `1px solid ${C.border}`, borderRadius: '7px', padding: '7px 10px', color: C.muted, fontSize: '12px', marginBottom: '9px' }}>{user?.email}</div>
                     <label style={lbl}>Moneda</label>
-                    <select style={sel}><option>COP — Peso colombiano</option><option>USD — Dólar</option><option>CLP — Peso chileno</option></select>
+                    <select value={currency} onChange={async e => { setCurrency(e.target.value); await supabase.from('profiles').update({ currency: e.target.value }).eq('id', user!.id) }} style={{ ...sel, width: '100%' }}>
+                      <option value="COP">COP — Peso colombiano</option>
+                      <option value="USD">USD — Dólar</option>
+                      <option value="CLP">CLP — Peso chileno</option>
+                      <option value="MXN">MXN — Peso mexicano</option>
+                      <option value="PEN">PEN — Sol peruano</option>
+                    </select>
                   </div>
                 </>}
                 {adjSub === 'categorias' && <>
@@ -1343,7 +1358,7 @@ function MobileApp() {
       supabase.from('profiles').select('*').eq('id', user!.id).single(),
     ])
     if (t.data) setTxs(t.data); if (c.data) setCats(c.data); if (p.data) setPms(p.data)
-    if (g.data) setGami(g.data); if (b.data) setBudgets(b.data); if (pr.data) setProfile(pr.data)
+    if (g.data) setGami(g.data); if (b.data) setBudgets(b.data); if (pr.data) { setProfile(pr.data); setCurrency(pr.data.currency || 'COP') }
     setLoading(false)
   }
 
@@ -2008,7 +2023,13 @@ function MobileApp() {
                     <label style={lbl}>Plan</label>
                     <div style={{ background: '#0f0f1a', border: `1px solid ${C.border}`, borderRadius: '10px', padding: '12px 14px', fontSize: '14px', marginBottom: '14px', color: isPro ? C.green : C.muted }}>{isPro ? '⚡ Pro' : '🔒 Free'}</div>
                     <label style={lbl}>Moneda</label>
-                    <select style={{ ...sel, width: '100%', fontSize: '15px' }}><option>COP — Peso colombiano</option><option>USD — Dólar</option><option>CLP — Peso chileno</option><option>MXN — Peso mexicano</option><option>PEN — Sol peruano</option></select>
+                    <select value={currency} onChange={async e => { setCurrency(e.target.value); await supabase.from('profiles').update({ currency: e.target.value }).eq('id', user!.id) }} style={{ ...sel, width: '100%', fontSize: '15px' }}>
+                      <option value="COP">COP — Peso colombiano</option>
+                      <option value="USD">USD — Dólar</option>
+                      <option value="CLP">CLP — Peso chileno</option>
+                      <option value="MXN">MXN — Peso mexicano</option>
+                      <option value="PEN">PEN — Sol peruano</option>
+                    </select>
                   </div>
                 </>}
 
