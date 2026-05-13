@@ -84,8 +84,8 @@ function LoginPage({ onReg }: { onReg: () => void }) {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <img src={LOGO} style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Clarix" />
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
+          <img src={LOGO} style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Fluxyy" />
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Fluxyy</h1>
           <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Inicia sesión para continuar</p>
         </div>
         <div style={{ ...card, padding: '28px' }}>
@@ -132,8 +132,8 @@ function RegisterPage({ onLogin }: { onLogin: () => void }) {
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <img src={LOGO} style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Clarix" />
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Clarix</h1>
+          <img src={LOGO} style={{ width: '80px', height: '80px', borderRadius: '20px', margin: '0 auto 16px', display: 'block', boxShadow: '0 0 24px rgba(13,13,20,.6)' }} alt="Fluxyy" />
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: C.text, margin: '0 0 6px' }}>Fluxyy</h1>
           <p style={{ color: C.muted, fontSize: '14px', margin: 0 }}>Crea tu cuenta gratis</p>
         </div>
         <div style={{ ...card, padding: '28px' }}>
@@ -345,7 +345,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚡</div>
-        <div style={{ fontWeight: 700, fontSize: '20px', color: '#e8e8f0', marginBottom: '6px' }}>Clarix Pro</div>
+        <div style={{ fontWeight: 700, fontSize: '20px', color: '#e8e8f0', marginBottom: '6px' }}>Fluxyy Pro</div>
         <div style={{ fontSize: '13px', color: '#6060a0', marginBottom: '20px', lineHeight: 1.5 }}>Desbloquea el registro de movimientos, categorías, presupuesto e IA</div>
         <div style={{ background: '#12121e', borderRadius: '12px', border: '1px solid #252535', padding: '16px', marginBottom: '20px' }}>
           <div style={{ fontSize: '32px', fontWeight: 700, color: '#e8e8f0', letterSpacing: '-.04em' }}>$5 <span style={{ fontSize: '14px', color: '#6060a0', fontWeight: 400 }}>USD/mes</span></div>
@@ -356,7 +356,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
             <div key={i} style={{ fontSize: '12px', color: '#c0c0e0' }}>{f}</div>
           ))}
         </div>
-        <a href="mailto:tu@email.com?subject=Quiero%20Clarix%20Pro" style={{ display: 'block', padding: '13px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', textDecoration: 'none', marginBottom: '10px' }}>
+        <a href="mailto:tu@email.com?subject=Quiero%20Fluxyy%20Pro" style={{ display: 'block', padding: '13px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', textDecoration: 'none', marginBottom: '10px' }}>
           Suscribirme por $5/mes →
         </a>
         <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px solid #252535', borderRadius: '9px', color: '#6060a0', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Ahora no</button>
@@ -461,7 +461,7 @@ function AdminPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>👑 Panel Admin</div>
-          <div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Gestión de usuarios Clarix</div>
+          <div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Gestión de usuarios Fluxyy</div>
         </div>
         <button onClick={loadUsers} style={{ ...btn, fontSize: '11px', padding: '6px 12px' }}>↻ Actualizar</button>
       </div>
@@ -753,9 +753,9 @@ function MainApp() {
       <div style={{ width: '200px', flexShrink: 0, background: C.sbg, borderRight: `1px solid #1e1e2e`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid #1e1e2e' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <img src={LOGO} style={{ width: '30px', height: '30px', borderRadius: '8px' }} alt="Clarix" />
+            <img src={LOGO} style={{ width: '30px', height: '30px', borderRadius: '8px' }} alt="Fluxyy" />
             <div>
-              <div style={{ fontWeight: 700, fontSize: '15px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
+              <div style={{ fontWeight: 700, fontSize: '15px', color: C.text, letterSpacing: '-.02em' }}>Fluxyy</div>
               <div style={{ fontSize: '10px', color: C.sub, marginTop: '1px' }}>Planeación financiera</div>
             </div>
           </div>
@@ -808,7 +808,7 @@ function MainApp() {
               {!isPro && (
                 <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div>
                     <div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos, usa IA y mucho más</div>
                   </div>
                   <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
@@ -1482,9 +1482,9 @@ function MobileApp() {
         <div style={{ width: '200px', flexShrink: 0, background: C.sbg, borderRight: `1px solid #1e1e2e`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
           <div style={{ padding: '16px 14px 12px', borderBottom: '1px solid #1e1e2e' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <img src={LOGO} style={{ width: '30px', height: '30px', borderRadius: '8px' }} alt="Clarix" />
+              <img src={LOGO} style={{ width: '30px', height: '30px', borderRadius: '8px' }} alt="Fluxyy" />
               <div>
-                <div style={{ fontWeight: 700, fontSize: '15px', color: C.text }}>Clarix</div>
+                <div style={{ fontWeight: 700, fontSize: '15px', color: C.text }}>Fluxyy</div>
                 <div style={{ fontSize: '10px', color: C.sub }}>Planeación financiera</div>
               </div>
             </div>
@@ -1539,7 +1539,7 @@ function MobileApp() {
                           {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
                           {!isPro && (
                             <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos y mucho más</div></div>
+                              <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos y mucho más</div></div>
                               <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
                             </div>
                           )}
@@ -1652,9 +1652,9 @@ function MobileApp() {
       {/* TOP BAR */}
       <div style={{ position: 'sticky', top: 0, zIndex: 50, background: C.sbg, borderBottom: `1px solid ${C.border}`, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src={LOGO} style={{ width: '32px', height: '32px', borderRadius: '9px' }} alt="Clarix" />
+          <img src={LOGO} style={{ width: '32px', height: '32px', borderRadius: '9px' }} alt="Fluxyy" />
           <div>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: C.text, letterSpacing: '-.02em' }}>Clarix</div>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: C.text, letterSpacing: '-.02em' }}>Fluxyy</div>
             <div style={{ fontSize: '10px', color: C.sub }}>
               {isAdmin ? <span style={{ color: '#fbbf24' }}>👑 Admin</span> : isPro ? <span style={{ color: C.green }}>⚡ Pro</span> : <span>Free</span>}
             </div>
@@ -1675,7 +1675,7 @@ function MobileApp() {
             <div style={pageStyle}>
               {!isPro && (
                 <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '14px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Clarix Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra movimientos y mucho más</div></div>
+                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra movimientos y mucho más</div></div>
                   <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
                 </div>
               )}
@@ -1970,7 +1970,7 @@ function MobileApp() {
 
                 {!isPro && (
                   <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '16px', marginBottom: '16px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div><div style={{ fontWeight: 700, fontSize: '14px', color: '#b0a8ff' }}>⚡ Clarix Pro</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>$5 USD/mes · Desbloquea todo</div></div>
+                    <div><div style={{ fontWeight: 700, fontSize: '14px', color: '#b0a8ff' }}>⚡ Fluxyy Pro</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>$5 USD/mes · Desbloquea todo</div></div>
                     <div style={{ fontSize: '20px', color: '#8b7ff0' }}>›</div>
                   </div>
                 )}
@@ -2126,8 +2126,8 @@ function AppRoot() {
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center' }}>
-        <img src={LOGO} style={{ width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 14px', display: 'block' }} alt="Clarix" />
-        <div style={{ color: '#6060a0', fontSize: '13px' }}>Cargando Clarix...</div>
+        <img src={LOGO} style={{ width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 14px', display: 'block' }} alt="Fluxyy" />
+        <div style={{ color: '#6060a0', fontSize: '13px' }}>Cargando Fluxyy...</div>
       </div>
     </div>
   )
