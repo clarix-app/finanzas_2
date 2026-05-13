@@ -2172,6 +2172,157 @@ function MobileApp() {
   )
 }
 
+function OnboardingPage({ onDone }: { onDone: (currency: string, cats: {name:string;color:string}[]) => void }) {
+  const [step, setStep] = useState(0)
+  const [currency, setCurrency] = useState('COP')
+  const [selectedCats, setSelectedCats] = useState<string[]>(['Alimentación', 'Transporte', 'Salud'])
+
+  const PRESET_CATS = [
+    { name: 'Alimentación', ic: '🛒', color: '#fb923c' },
+    { name: 'Transporte', ic: '🚗', color: '#60a5fa' },
+    { name: 'Salud', ic: '💊', color: '#f87171' },
+    { name: 'Entretenimiento', ic: '🎬', color: '#c084fc' },
+    { name: 'Educación', ic: '📚', color: '#4ade80' },
+    { name: 'Ropa', ic: '👕', color: '#fbbf24' },
+    { name: 'Vivienda', ic: '🏠', color: '#818cf8' },
+    { name: 'Mascotas', ic: '🐾', color: '#f472b6' },
+    { name: 'Viajes', ic: '✈️', color: '#2dd4bf' },
+    { name: 'Restaurantes', ic: '🍽️', color: '#fb923c' },
+    { name: 'Gym', ic: '💪', color: '#4ade80' },
+    { name: 'Suscripciones', ic: '📱', color: '#a89ef5' },
+    { name: 'Combustible', ic: '⛽', color: '#fbbf24' },
+    { name: 'Ahorro', ic: '💎', color: '#38bdf8' },
+    { name: 'Inversiones', ic: '📈', color: '#4ade80' },
+    { name: 'Otros', ic: '📦', color: '#6060a0' },
+  ]
+
+  const toggleCat = (name: string) => setSelectedCats(prev => prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name])
+
+  const steps = [
+    // Step 0 - Bienvenida
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '32px 24px', textAlign: 'center' }}>
+      <img src={LOGO} style={{ width: '100px', height: '100px', borderRadius: '26px', marginBottom: '28px', boxShadow: '0 0 40px rgba(139,127,240,.4)' }} alt="Fluxyy" />
+      <div style={{ fontSize: '32px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '12px' }}>Bienvenido a Fluxyy</div>
+      <div style={{ fontSize: '16px', color: C.muted, lineHeight: 1.6, maxWidth: '300px', marginBottom: '40px' }}>Tu copiloto financiero para tomar el control de tu dinero</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '340px' }}>
+        {[{ ic: '📊', t: 'Registra tus movimientos', d: 'Ingresos y gastos en segundos' }, { ic: '💰', t: 'Controla tu presupuesto', d: 'Límites por categoría con alertas' }, { ic: '📈', t: 'Analiza tus finanzas', d: 'Reportes y gráficos en tiempo real' }].map((f, i) => (
+          <div key={i} style={{ ...card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left' }}>
+            <div style={{ fontSize: '28px', flexShrink: 0 }}>{f.ic}</div>
+            <div><div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{f.t}</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>{f.d}</div></div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setStep(1)} style={{ ...btn, width: '100%', maxWidth: '340px', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '32px' }}>Comenzar →</button>
+    </div>,
+
+    // Step 1 - Moneda
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '80px 24px 40px' }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '8px' }}>¿Cuál es tu moneda?</div>
+      <div style={{ fontSize: '15px', color: C.muted, marginBottom: '32px' }}>Puedes cambiarla después en Ajustes</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+        {[{ code: 'COP', flag: '🇨🇴', name: 'Peso colombiano', sym: '$' }, { code: 'CLP', flag: '🇨🇱', name: 'Peso chileno', sym: '$' }, { code: 'MXN', flag: '🇲🇽', name: 'Peso mexicano', sym: '$' }, { code: 'PEN', flag: '🇵🇪', name: 'Sol peruano', sym: 'S/' }, { code: 'USD', flag: '🇺🇸', name: 'Dólar', sym: '$' }].map(c => (
+          <div key={c.code} onClick={() => setCurrency(c.code)} style={{ ...card, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: currency === c.code ? `2px solid ${C.primary}` : `1px solid ${C.border}`, background: currency === c.code ? C.primaryLight : C.card, transition: 'all .15s' }}>
+            <div style={{ fontSize: '28px' }}>{c.flag}</div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: '15px', fontWeight: 600, color: C.text }}>{c.name}</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>{c.code} · {c.sym}</div></div>
+            {currency === c.code && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setStep(2)} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '24px' }}>Siguiente →</button>
+    </div>,
+
+    // Step 2 - Categorías
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '80px 24px 40px' }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '8px' }}>Elige tus categorías</div>
+      <div style={{ fontSize: '15px', color: C.muted, marginBottom: '20px' }}>Toca las que usas — puedes agregar más después</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', flex: 1, overflowY: 'auto', paddingBottom: '8px' }}>
+        {PRESET_CATS.map(c => {
+          const selected = selectedCats.includes(c.name)
+          return (
+            <div key={c.name} onClick={() => toggleCat(c.name)} style={{ background: selected ? `${c.color}22` : C.card, border: `2px solid ${selected ? c.color : C.border}`, borderRadius: '14px', padding: '14px 8px', cursor: 'pointer', textAlign: 'center', transition: 'all .15s', position: 'relative' }}>
+              {selected && <div style={{ position: 'absolute', top: '6px', right: '6px', width: '16px', height: '16px', borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+              <div style={{ fontSize: '28px', marginBottom: '6px' }}>{c.ic}</div>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: selected ? C.text : C.muted }}>{c.name}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ fontSize: '12px', color: C.muted, textAlign: 'center', margin: '10px 0 4px' }}>{selectedCats.length} categorías seleccionadas</div>
+      <button
+        onClick={() => {
+          const catsWithColors = selectedCats.map(name => {
+            const cat = PRESET_CATS.find(c => c.name === name)
+            return { name, color: cat?.color || '#6060a0' }
+          })
+          onDone(currency, catsWithColors)
+        }}
+        disabled={selectedCats.length === 0}
+        style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '8px', opacity: selectedCats.length === 0 ? 0.6 : 1 }}>
+        ¡Empezar! 🚀
+      </button>
+    </div>
+  ]
+
+  return (
+    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark', maxWidth: '500px', margin: '0 auto' }}>
+      {step > 0 && (
+        <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '500px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10, background: C.bg }}>
+          <button onClick={() => setStep(s => s - 1)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '22px', padding: '0' }}>←</button>
+          <div style={{ flex: 1, display: 'flex', gap: '6px' }}>
+            {[1, 2].map(i => <div key={i} style={{ flex: 1, height: '3px', borderRadius: '99px', background: i <= step ? C.primary : C.border, transition: 'background .3s' }} />)}
+          </div>
+          <div style={{ fontSize: '12px', color: C.muted }}>{step}/2</div>
+        </div>
+      )}
+      {steps[step]}
+    </div>
+  )
+}
+
+function AppRoot() {
+  const { user, loading } = useAuth()
+  const [view, setView] = useState<'login' | 'register'>('login')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true)
+
+  useEffect(() => {
+    if (user) {
+      supabase.from('profiles').select('onboarding_done').eq('id', user.id).single().then(({ data }) => {
+        if (!data?.onboarding_done) setShowOnboarding(true)
+        setCheckingOnboarding(false)
+      })
+    } else {
+      setCheckingOnboarding(false)
+    }
+  }, [user])
+
+  const finishOnboarding = async (currency: string, cats: {name:string;color:string}[]) => {
+    if (user) {
+      await supabase.from('profiles').update({ currency, onboarding_done: true }).eq('id', user.id)
+      if (cats.length > 0) {
+        const inserts = cats.map(c => ({ user_id: user.id, space: 'personal', type: 'egreso', name: c.name, color: c.color, is_default: false }))
+        inserts.push({ user_id: user.id, space: 'personal', type: 'ingreso', name: 'Ingresos', color: '#a89ef5', is_default: true })
+        await supabase.from('categories').upsert(inserts, { onConflict: 'user_id,space,name' })
+      }
+    }
+    setShowOnboarding(false)
+  }
+
+  if (loading || checkingOnboarding) return (
+    <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ textAlign: 'center' }}>
+        <img src={LOGO} style={{ width: '64px', height: '64px', borderRadius: '16px', margin: '0 auto 14px', display: 'block' }} alt="Fluxyy" />
+        <div style={{ color: '#6060a0', fontSize: '13px' }}>Cargando Fluxyy...</div>
+      </div>
+    </div>
+  )
+  if (!user) return view === 'register'
+    ? <RegisterPage onLogin={() => setView('login')} />
+    : <LoginPage onReg={() => setView('register')} />
+  if (showOnboarding) return <OnboardingPage onDone={finishOnboarding} />
+  return <MainApp />
+}
+
 export default function App() {
   return (
     <AuthProvider>
