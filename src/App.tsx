@@ -362,26 +362,45 @@ function EditModal({ tx, pms, space, cats, onSave, onDelete, onClose }: { tx: Tx
 }
 
 function UpgradeModal({ onClose }: { onClose: () => void }) {
+  const [selected, setSelected] = useState<'pro' | 'pro_full'>('pro_full')
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(5,5,10,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, backdropFilter: 'blur(4px)' }
-  const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '16px', padding: '28px', width: '380px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif", textAlign: 'center' }
+  const box: React.CSSProperties = { background: '#17172a', border: '1px solid #2a2a3e', borderRadius: '16px', padding: '24px', width: '400px', maxWidth: '95vw', boxShadow: '0 8px 40px rgba(0,0,0,.7)', fontFamily: "'DM Sans', sans-serif" }
   return (
     <div style={overlay} onClick={onClose}>
       <div style={box} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: '40px', marginBottom: '12px' }}>⚡</div>
-        <div style={{ fontWeight: 700, fontSize: '20px', color: '#e8e8f0', marginBottom: '6px' }}>Fluxyy Pro</div>
-        <div style={{ fontSize: '13px', color: '#6060a0', marginBottom: '20px', lineHeight: 1.5 }}>Desbloquea el registro de movimientos, categorías, presupuesto e IA</div>
-        <div style={{ background: '#12121e', borderRadius: '12px', border: '1px solid #252535', padding: '16px', marginBottom: '20px' }}>
-          <div style={{ fontSize: '32px', fontWeight: 700, color: '#e8e8f0', letterSpacing: '-.04em' }}>$5 <span style={{ fontSize: '14px', color: '#6060a0', fontWeight: 400 }}>USD/mes</span></div>
-          <div style={{ fontSize: '11px', color: '#5555a0', marginTop: '4px' }}>Cancela cuando quieras</div>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div style={{ fontSize: '36px', marginBottom: '8px' }}>⚡</div>
+          <div style={{ fontWeight: 700, fontSize: '20px', color: '#e8e8f0', marginBottom: '6px' }}>Fluxyy Pro</div>
+          <div style={{ fontSize: '13px', color: '#6060a0', lineHeight: 1.5 }}>Elige el plan que mejor se adapte a ti</div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px', textAlign: 'left' }}>
-          {['✅ Movimientos ilimitados', '✅ Categorías personalizadas', '✅ Presupuesto por categoría', '✅ Autocategorización con IA', '✅ Reportes y Pareto 80/20', '✅ Espacios Personal y Empresa'].map((f, i) => (
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+          {[
+            { id: 'pro' as const, label: '1 Espacio', desc: 'Personal O Negocio', price: '$2.99', sub: 'USD/mes', color: '#8b7ff0', ic: '👤' },
+            { id: 'pro_full' as const, label: '2 Espacios', desc: 'Personal Y Negocio', price: '$4.99', sub: 'USD/mes', color: '#4ade80', ic: '⚡', badge: 'Más popular' },
+          ].map(plan => (
+            <div key={plan.id} onClick={() => setSelected(plan.id)} style={{ background: selected === plan.id ? `${plan.color}18` : '#12121e', border: `2px solid ${selected === plan.id ? plan.color : '#252535'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', position: 'relative', transition: 'all .15s' }}>
+              {plan.badge && <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: plan.color, color: '#0d0d14', fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', whiteSpace: 'nowrap' }}>{plan.badge}</div>}
+              <div style={{ fontSize: '22px', marginBottom: '6px' }}>{plan.ic}</div>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: '#e8e8f0', marginBottom: '2px' }}>{plan.label}</div>
+              <div style={{ fontSize: '11px', color: '#6060a0', marginBottom: '10px' }}>{plan.desc}</div>
+              <div style={{ fontWeight: 800, fontSize: '22px', color: selected === plan.id ? plan.color : '#e8e8f0', letterSpacing: '-.03em' }}>{plan.price}</div>
+              <div style={{ fontSize: '10px', color: '#6060a0' }}>{plan.sub}</div>
+              {selected === plan.id && <div style={{ position: 'absolute', top: '8px', right: '8px', width: '18px', height: '18px', borderRadius: '50%', background: plan.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '20px' }}>
+          {['✅ Movimientos ilimitados', '✅ Categorías personalizadas', '✅ Presupuesto por categoría', '✅ Autocategorización con IA', '✅ Reportes y Pareto 80/20', selected === 'pro_full' ? '✅ Espacio Personal + Negocio' : '✅ 1 espacio a elegir'].map((f, i) => (
             <div key={i} style={{ fontSize: '12px', color: '#c0c0e0' }}>{f}</div>
           ))}
         </div>
-        <a href="mailto:tu@email.com?subject=Quiero%20Fluxyy%20Pro" style={{ display: 'block', padding: '13px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', textDecoration: 'none', marginBottom: '10px' }}>
-          Suscribirme por $5/mes →
+
+        <a href={`mailto:fpadillav1@gmail.com?subject=Quiero%20Fluxyy%20Pro%20${selected === 'pro_full' ? '2%20espacios%20-%20%244.99' : '1%20espacio%20-%20%242.99'}`} style={{ display: 'block', padding: '14px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#8b7ff0,#6a8af0)', color: '#fff', textDecoration: 'none', marginBottom: '10px', textAlign: 'center' }}>
+          Suscribirme por {selected === 'pro_full' ? '$4.99' : '$2.99'}/mes →
         </a>
+        <div style={{ fontSize: '11px', color: '#5555a0', textAlign: 'center', marginBottom: '12px' }}>Cancela cuando quieras</div>
         <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px solid #252535', borderRadius: '9px', color: '#6060a0', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>Ahora no</button>
       </div>
     </div>
@@ -834,7 +853,7 @@ function MainApp() {
               {!isPro && (
                 <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div>
+                    <div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — desde $2.99 USD/mes</div>
                     <div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos, usa IA y mucho más</div>
                   </div>
                   <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
@@ -1574,7 +1593,7 @@ function MobileApp() {
                           {ph('Inicio', `${isEmp ? 'Finanzas empresa' : 'Finanzas personales'} · ${MONTHS[month]} ${year}`)}
                           {!isPro && (
                             <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '12px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos y mucho más</div></div>
+                              <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — desde $2.99 USD/mes</div><div style={{ fontSize: '11px', color: '#6060a0', marginTop: '3px' }}>Registra movimientos y mucho más</div></div>
                               <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
                             </div>
                           )}
@@ -1710,7 +1729,7 @@ function MobileApp() {
             <div style={pageStyle}>
               {!isPro && (
                 <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '14px 16px', marginBottom: '14px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — $5 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra movimientos y mucho más</div></div>
+                  <div><div style={{ fontWeight: 700, fontSize: '13px', color: '#b0a8ff' }}>⚡ Activa Fluxyy Pro — desde $2.99 USD/mes</div><div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>Registra movimientos y mucho más</div></div>
                   <div style={{ fontSize: '18px', color: '#8b7ff0' }}>›</div>
                 </div>
               )}
@@ -2005,7 +2024,7 @@ function MobileApp() {
 
                 {!isPro && (
                   <div onClick={() => setShowUpgrade(true)} style={{ ...card, padding: '16px', marginBottom: '16px', cursor: 'pointer', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.1))', border: '1px solid rgba(139,127,240,.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div><div style={{ fontWeight: 700, fontSize: '14px', color: '#b0a8ff' }}>⚡ Fluxyy Pro</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>$5 USD/mes · Desbloquea todo</div></div>
+                    <div><div style={{ fontWeight: 700, fontSize: '14px', color: '#b0a8ff' }}>⚡ Fluxyy Pro</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>Desde $2.99 USD/mes · Desbloquea todo</div></div>
                     <div style={{ fontSize: '20px', color: '#8b7ff0' }}>›</div>
                   </div>
                 )}
