@@ -2300,9 +2300,14 @@ function AppRoot() {
     if (user) {
       await supabase.from('profiles').update({ currency, onboarding_done: true }).eq('id', user.id)
       if (cats.length > 0) {
-        const inserts = cats.map(c => ({ user_id: user.id, space: 'personal', type: 'egreso', name: c.name, color: c.color, is_default: false }))
-        inserts.push({ user_id: user.id, space: 'personal', type: 'ingreso', name: 'Ingresos', color: '#a89ef5', is_default: true })
-        await supabase.from('categories').upsert(inserts, { onConflict: 'user_id,space,name' })
+        // Check which categories already exist to avoid duplicates
+        const { data: existing } = await supabase.from('categories').select('name').eq('user_id', user.id).eq('space', 'personal')
+        const existingNames = (existing || []).map((c: any) => c.name)
+        const newCats = cats.filter(c => !existingNames.includes(c.name))
+        if (newCats.length > 0) {
+          const inserts = newCats.map(c => ({ user_id: user.id, space: 'personal', type: 'egreso', name: c.name, color: c.color, is_default: false }))
+          await supabase.from('categories').insert(inserts)
+        }
       }
     }
     setShowOnboarding(false)
