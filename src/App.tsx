@@ -20,8 +20,23 @@ interface AdminUser { id: string; email: string; name: string; plan: string; cre
 
 const ADMIN_EMAIL = 'fpadillav1@gmail.com'
 
-const fmt = (n: number) => '$' + Math.abs(Math.round(n)).toLocaleString('es-CO')
-const fmtM = (n: number) => n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : fmt(n)
+const fmt = (n: number, cur = 'COP') => {
+  const abs = Math.abs(n)
+  switch(cur) {
+    case 'COP': return '$' + Math.round(abs).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    case 'CLP': return '$' + Math.round(abs).toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    case 'MXN': return '$' + Math.round(abs).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    case 'PEN': return 'S/' + Math.round(abs).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    case 'USD': return '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    default: return '$' + Math.round(abs).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  }
+}
+const fmtM = (n: number, cur = 'COP') => {
+  const sym = cur === 'PEN' ? 'S/' : '$'
+  if (n >= 1000000) return sym + (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return sym + (n / 1000).toFixed(0) + 'K'
+  return fmt(n, cur)
+}
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 
@@ -722,6 +737,8 @@ function MainApp() {
   ]
   const isAdmin = user?.email === ADMIN_EMAIL
   const isPro = profile?.plan === 'pro'
+  const f = (n: number) => fmt(n, currency)
+  const fM = (n: number) => fmtM(n, currency)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -748,7 +765,7 @@ function MainApp() {
       {items.map((k, i) => (
         <div key={i} style={{ ...card, padding: '13px 15px' }}>
           <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
-          <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{fmt(k.v)}</div>
+          <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{f(k.v)}</div>
           <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{MONTHS[month]} {year}</div>
         </div>
       ))}
@@ -847,7 +864,7 @@ function MainApp() {
                   txMonth.slice(0, 5).map(t => (
                     <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)', cursor: 'pointer' }}>
                       <div><div style={{ fontSize: '12px', color: '#c0c0e0' }}>{t.description}</div><div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{t.date} · {t.payment_method || '—'}</div></div>
-                      <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</div>
+                      <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{f(t.amount)}</div>
                     </div>
                   ))}
               </div>
@@ -879,7 +896,7 @@ function MainApp() {
                         <span>{t.description}</span>
                         <span style={{ fontSize: '11px', color: C.muted }}>{t.category_name || '—'}</span>
                         {isEmp && <span style={{ fontSize: '11px', color: C.muted }}>{t.client || '—'}</span>}
-                        <span style={{ fontWeight: 700, textAlign: 'right', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</span>
+                        <span style={{ fontWeight: 700, textAlign: 'right', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{f(t.amount)}</span>
                       </div>
                     ))}
                 </div>
@@ -889,7 +906,7 @@ function MainApp() {
                   {['hoy', '7d', '15d', '30d'].map(f => <button key={f} onClick={() => setCajaF(f)} style={{ padding: '5px 11px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: cajaF === f ? 'none' : `1px solid ${C.border}`, background: cajaF === f ? 'linear-gradient(135deg,#8b7ff0,#6a8af0)' : '#1a1a2e', color: cajaF === f ? 'white' : '#8888b8' }}>{f === 'hoy' ? 'Hoy' : f === '7d' ? '7 días' : f === '15d' ? '15 días' : '30 días'}</button>)}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '12px' }}>
-                  {[{ l: 'Saldo inicial', v: '$0', c: C.text, s: 'Opcional' }, { l: 'Ingresos', v: fmt(cajaIng), c: C.purple }, { l: 'Egresos', v: fmt(cajaEg), c: C.red }, { l: 'Disponible', v: fmt(cajaIng - cajaEg), c: C.green }].map((c, i) => (
+                  {[{ l: 'Saldo inicial', v: '$0', c: C.text, s: 'Opcional' }, { l: 'Ingresos', v: f(cajaIng), c: C.purple }, { l: 'Egresos', v: f(cajaEg), c: C.red }, { l: 'Disponible', v: f(cajaIng - cajaEg), c: C.green }].map((c, i) => (
                     <div key={i} style={{ ...card, padding: '11px 13px' }}>
                       <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{c.l}</div>
                       <div style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-.03em', marginTop: '4px', color: c.c }}>{c.v}</div>
@@ -906,7 +923,7 @@ function MainApp() {
                           sec.data.map(([pm, amt]) => (
                             <div key={pm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 13px', borderBottom: '1px solid rgba(37,37,53,.4)' }}>
                               <span style={{ fontSize: '12px', color: '#c0c0e0' }}>{pm}</span>
-                              <span style={{ fontWeight: 700, fontSize: '13px', color: sec.color }}>{fmt(amt)}</span>
+                              <span style={{ fontWeight: 700, fontSize: '13px', color: sec.color }}>{f(amt)}</span>
                             </div>
                           ))}
                       </div>
@@ -921,7 +938,7 @@ function MainApp() {
                 <div><div style={{ fontWeight: 700, fontSize: '17px', color: C.text }}>Consolidado</div><div style={{ fontSize: '11px', color: C.sub, marginTop: '2px' }}>Vista general {isEmp ? 'empresa' : 'personal'} · {year}</div></div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '14px' }}>
-                {[{ l: 'Ingresos acum.', v: fmtM(totIng), c: C.purple }, { l: 'Egresos acum.', v: fmtM(totEg), c: C.red }, { l: isEmp ? 'Utilidad acum.' : 'Ahorro acum.', v: fmtM(totUtil), c: C.green, s: `Margen ${avgMgn}%` }].map((k, i) => (
+                {[{ l: 'Ingresos acum.', v: fM(totIng), c: C.purple }, { l: 'Egresos acum.', v: fM(totEg), c: C.red }, { l: isEmp ? 'Utilidad acum.' : 'Ahorro acum.', v: fM(totUtil), c: C.green, s: `Margen ${avgMgn}%` }].map((k, i) => (
                   <div key={i} style={{ ...card, padding: '13px 15px' }}>
                     <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
                     <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{k.v}</div>
@@ -945,7 +962,7 @@ function MainApp() {
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '9px' }}>
-                <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>Mejor mes</div><div style={{ fontWeight: 700, fontSize: '18px', color: C.green, margin: '6px 0 2px' }}>{MONTHS[bestM]}</div><div style={{ fontSize: '11px', color: C.muted }}>{fmtM(byMonthData[bestM]?.ing || 0)} ingresos</div></div>
+                <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>Mejor mes</div><div style={{ fontWeight: 700, fontSize: '18px', color: C.green, margin: '6px 0 2px' }}>{MONTHS[bestM]}</div><div style={{ fontSize: '11px', color: C.muted }}>{fM(byMonthData[bestM]?.ing || 0)} ingresos</div></div>
                 <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>Margen promedio</div><div style={{ fontWeight: 700, fontSize: '18px', color: C.purple, margin: '6px 0 2px' }}>{avgMgn}%</div><div style={{ fontSize: '11px', color: C.muted }}>Ene — {MONTHS[new Date().getMonth()]} {year}</div></div>
               </div>
             </>}
@@ -987,7 +1004,7 @@ function MainApp() {
                         {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmt(c.spent)} / {fmt(c.limit)}</span>
+                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{f(c.spent)} / {f(c.limit)}</span>
                         <button onClick={() => { if (c.budgetId) deleteBudget(c.budgetId) }} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>×</button>
                       </div>
                     </div>
@@ -1025,7 +1042,7 @@ function MainApp() {
               </div>
               {rTab === 'resumen' && <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '12px' }}>
-                  {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Ut. bruta', v: fmtM(ing), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. operacional', v: fmtM(util), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. neta', v: fmtM(util), c: C.green }].map((k, i) => (
+                  {[{ l: 'Ingresos', v: fM(ing), c: C.purple }, { l: 'Ut. bruta', v: fM(ing), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. operacional', v: fM(util), c: C.purple, s: `Margen ${margin}%` }, { l: 'Ut. neta', v: fM(util), c: C.green }].map((k, i) => (
                     <div key={i} style={{ ...card, padding: '11px 13px' }}>
                       <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
                       <div style={{ fontWeight: 700, fontSize: '15px', letterSpacing: '-.03em', color: k.c, margin: '4px 0 2px' }}>{k.v}</div>
@@ -1037,7 +1054,7 @@ function MainApp() {
                   <div style={{ ...card, padding: '14px' }}>
                     <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Ingresos vs Egresos</div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '80px' }}>
-                      {[{ v: ing, c: C.primary, l: 'Ing' }, { v: eg, c: C.red, l: 'Eg' }, { v: Math.max(0, util), c: C.green, l: 'Neto' }].map((b, i) => { const max = Math.max(ing, eg, util) || 1; return <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}><div style={{ fontSize: '9px', color: C.muted }}>{fmtM(b.v)}</div><div style={{ width: '100%', height: `${b.v / max * 60}px`, background: b.c, borderRadius: '3px 3px 0 0', minHeight: '4px' }} /><div style={{ fontSize: '8px', color: C.muted }}>{b.l}</div></div> })}
+                      {[{ v: ing, c: C.primary, l: 'Ing' }, { v: eg, c: C.red, l: 'Eg' }, { v: Math.max(0, util), c: C.green, l: 'Neto' }].map((b, i) => { const max = Math.max(ing, eg, util) || 1; return <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end' }}><div style={{ fontSize: '9px', color: C.muted }}>{fM(b.v)}</div><div style={{ width: '100%', height: `${b.v / max * 60}px`, background: b.c, borderRadius: '3px 3px 0 0', minHeight: '4px' }} /><div style={{ fontSize: '8px', color: C.muted }}>{b.l}</div></div> })}
                     </div>
                   </div>
                   <div style={{ ...card, padding: '14px' }}>
@@ -1055,7 +1072,7 @@ function MainApp() {
                 const total = rTab === 'ingresos' ? ing : eg
                 const color = rTab === 'ingresos' ? C.purple : C.red
                 return <>
-                  <div style={{ fontWeight: 700, fontSize: '22px', letterSpacing: '-.04em', marginBottom: '14px', color }}>{fmt(total)}</div>
+                  <div style={{ fontWeight: 700, fontSize: '22px', letterSpacing: '-.04em', marginBottom: '14px', color }}>{f(total)}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                     <div style={{ ...card, padding: '14px' }}>
                       <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Por categoría</div>
@@ -1064,14 +1081,14 @@ function MainApp() {
                     <div style={{ ...card, padding: '14px' }}>
                       <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '10px' }}>Top movimientos</div>
                       {items.length === 0 ? <div style={{ textAlign: 'center', color: C.muted, fontSize: '12px', padding: '20px' }}>No hay datos este mes</div> :
-                        items.slice(0, 5).map((it, i) => { const pct = total > 0 ? Math.round(it.amount / total * 100) : 0; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span><div style={{ width: '50px', height: '4px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div><span style={{ fontSize: '10px', fontWeight: 700, color, minWidth: '60px', textAlign: 'right' }}>{fmt(it.amount)}</span></div> })}
+                        items.slice(0, 5).map((it, i) => { const pct = total > 0 ? Math.round(it.amount / total * 100) : 0; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span><div style={{ width: '50px', height: '4px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div><span style={{ fontSize: '10px', fontWeight: 700, color, minWidth: '60px', textAlign: 'right' }}>{f(it.amount)}</span></div> })}
                     </div>
                   </div>
                 </>
               })()}
               {rTab === 'pareto' && <>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '14px' }}>
-                  {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Egresos', v: fmtM(eg), c: C.red }, { l: 'Neto', v: fmtM(util), c: C.green, s: `Margen ${margin}%` }].map((k, i) => <div key={i} style={{ ...card, padding: '12px 14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div><div style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-.04em', marginTop: '4px', color: k.c }}>{k.v}</div>{k.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{k.s}</div>}</div>)}
+                  {[{ l: 'Ingresos', v: fM(ing), c: C.purple }, { l: 'Egresos', v: fM(eg), c: C.red }, { l: 'Neto', v: fM(util), c: C.green, s: `Margen ${margin}%` }].map((k, i) => <div key={i} style={{ ...card, padding: '12px 14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div><div style={{ fontWeight: 700, fontSize: '1.2rem', letterSpacing: '-.04em', marginTop: '4px', color: k.c }}>{k.v}</div>{k.s && <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{k.s}</div>}</div>)}
                 </div>
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '14px' }}>
                   {[{ v: 'ingresos', l: '📈 ¿De dónde entra más?' }, { v: 'egresos', l: '📉 ¿A dónde se va más?' }].map(b => <button key={b.v} onClick={() => setParetoV(b.v)} style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '11px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: paretoV === b.v ? (b.v === 'ingresos' ? '1px solid rgba(139,127,240,.35)' : '1px solid rgba(248,113,113,.3)') : `1px solid ${C.border}`, background: paretoV === b.v ? (b.v === 'ingresos' ? 'rgba(139,127,240,.15)' : 'rgba(248,113,113,.1)') : '#1a1a2e', color: paretoV === b.v ? (b.v === 'ingresos' ? C.purple : C.red) : '#8888b8' }}>{b.l}</button>)}
@@ -1096,7 +1113,7 @@ function MainApp() {
                             <div style={{ fontSize: '12px', fontWeight: 500, flex: 1, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
                             <div style={{ flex: 1.8, height: '6px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${bw}%`, background: isTop ? rBarC : '#2a2a3e', borderRadius: '99px' }} /></div>
                             <div style={{ fontSize: '10px', color: C.muted, minWidth: '26px', textAlign: 'right' }}>{it.pct}%</div>
-                            <div style={{ fontWeight: 700, fontSize: '12px', minWidth: '84px', textAlign: 'right', color: isTop ? rColor : C.muted }}>{fmt(it.amount)}</div>
+                            <div style={{ fontWeight: 700, fontSize: '12px', minWidth: '84px', textAlign: 'right', color: isTop ? rColor : C.muted }}>{f(it.amount)}</div>
                           </div>
                         </div>
                       )
@@ -1336,6 +1353,9 @@ function MobileApp() {
 
   const isAdmin = user?.email === ADMIN_EMAIL
   const isPro = profile?.plan === 'pro'
+  const [currency, setCurrency] = useState('COP')
+  const f = (n: number) => fmt(n, currency)
+  const fM = (n: number) => fmtM(n, currency)
   const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768
   const [desktop, setDesktop] = useState(isDesktop)
 
@@ -1574,7 +1594,7 @@ function MobileApp() {
                             {[{ l: 'Ingresos', v: ing, c: C.purple }, { l: isEmp ? 'Egresos' : 'Gastos', v: eg, c: C.red }, { l: isEmp ? 'Utilidad' : 'Ahorro', v: util, c: C.green }].map((k, i) => (
                               <div key={i} style={{ ...card, padding: '13px 15px' }}>
                                 <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
-                                <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{fmt(k.v)}</div>
+                                <div style={{ fontWeight: 700, fontSize: '1.25rem', marginTop: '5px', color: k.c }}>{f(k.v)}</div>
                                 <div style={{ fontSize: '10px', color: C.muted, marginTop: '3px' }}>{MONTHS[month]} {year}</div>
                               </div>
                             ))}
@@ -1589,7 +1609,7 @@ function MobileApp() {
                               txMonth.slice(0, 5).map(t => (
                                 <div key={t.id} onClick={() => setEditTx(t)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(37,37,53,.5)', cursor: 'pointer' }}>
                                   <div><div style={{ fontSize: '12px', color: '#c0c0e0' }}>{t.description}</div><div style={{ fontSize: '10px', color: C.muted, marginTop: '2px' }}>{t.date} · {t.category_name || t.payment_method || '—'}</div></div>
-                                  <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{fmt(t.amount)}</div>
+                                  <div style={{ fontWeight: 700, fontSize: '13px', color: t.type === 'ingreso' ? C.green : C.red }}>{t.type === 'ingreso' ? '+' : '-'}{f(t.amount)}</div>
                                 </div>
                               ))}
                           </div>
@@ -1623,7 +1643,7 @@ function MobileApp() {
                                     {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmt(c.spent)} / {fmt(c.limit)}</span>
+                                    <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{f(c.spent)} / {f(c.limit)}</span>
                                     <button onClick={() => c.budgetId && deleteBudget(c.budgetId)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>×</button>
                                   </div>
                                 </div>
@@ -1716,7 +1736,7 @@ function MobileApp() {
                 {[{ l: 'Ingresos', v: ing, c: C.purple }, { l: isEmp ? 'Egresos' : 'Gastos', v: eg, c: C.red }, { l: isEmp ? 'Utilidad' : 'Ahorro', v: util, c: C.green }].map((k, i) => (
                   <div key={i} style={{ ...card, padding: '12px' }}>
                     <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>{k.l}</div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginTop: '4px', color: k.c }}>{fmtM(k.v)}</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', marginTop: '4px', color: k.c }}>{fM(k.v)}</div>
                   </div>
                 ))}
               </div>
@@ -1736,7 +1756,7 @@ function MobileApp() {
                       <div style={{ fontSize: '14px', color: '#c0c0e0', fontWeight: 500 }}>{t.description}</div>
                       <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{t.date.slice(5).replace('-', '/')} · {t.category_name || t.payment_method || '—'}</div>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: '15px', color: t.type === 'ingreso' ? C.green : C.red, marginLeft: '12px', flexShrink: 0 }}>{t.type === 'ingreso' ? '+' : '-'}{fmtM(t.amount)}</div>
+                    <div style={{ fontWeight: 700, fontSize: '15px', color: t.type === 'ingreso' ? C.green : C.red, marginLeft: '12px', flexShrink: 0 }}>{t.type === 'ingreso' ? '+' : '-'}{fM(t.amount)}</div>
                   </div>
                 ))}
               </div>
@@ -1755,7 +1775,7 @@ function MobileApp() {
                 {[{ l: 'Ingresos', v: movFiltered.filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0), c: C.purple }, { l: 'Egresos', v: movFiltered.filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0), c: C.red }, { l: 'Balance', v: movFiltered.filter(t=>t.type==='ingreso').reduce((s,t)=>s+t.amount,0)-movFiltered.filter(t=>t.type==='egreso').reduce((s,t)=>s+t.amount,0), c: C.green }].map((k,i) => (
                   <div key={i} style={{ ...card, padding: '12px' }}>
                     <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>{k.l}</div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginTop: '4px', color: k.c }}>{fmtM(k.v)}</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', marginTop: '4px', color: k.c }}>{fM(k.v)}</div>
                   </div>
                 ))}
               </div>
@@ -1784,7 +1804,7 @@ function MobileApp() {
                           <div style={{ fontSize: '14px', fontWeight: 500, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
                           <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px' }}>{t.date.slice(5).replace('-','/')} · {t.category_name || '—'} · {t.payment_method || '—'}</div>
                         </div>
-                        <div style={{ fontWeight: 700, fontSize: '15px', color: t.type === 'ingreso' ? C.green : C.red, flexShrink: 0 }}>{t.type === 'ingreso' ? '+' : '-'}{fmtM(t.amount)}</div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: t.type === 'ingreso' ? C.green : C.red, flexShrink: 0 }}>{t.type === 'ingreso' ? '+' : '-'}{fM(t.amount)}</div>
                       </div>
                     ))}
                 </div>
@@ -1794,7 +1814,7 @@ function MobileApp() {
                     {['hoy','7d','15d','30d'].map(f => <button key={f} onClick={() => setCajaF(f)} style={{ padding: '7px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', border: cajaF===f?'none':`1px solid ${C.border}`, background: cajaF===f?'linear-gradient(135deg,#8b7ff0,#6a8af0)':'#1a1a2e', color: cajaF===f?'white':'#8888b8' }}>{f==='hoy'?'Hoy':f==='7d'?'7 días':f==='15d'?'15 días':'30 días'}</button>)}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                    {[{ l: 'Ingresos', v: fmt(cajaIng), c: C.purple }, { l: 'Egresos', v: fmt(cajaEg), c: C.red }, { l: 'Disponible', v: fmt(cajaIng-cajaEg), c: C.green }, { l: 'Transacciones', v: cajaTx.length, c: C.text }].map((c,i) => (
+                    {[{ l: 'Ingresos', v: f(cajaIng), c: C.purple }, { l: 'Egresos', v: f(cajaEg), c: C.red }, { l: 'Disponible', v: f(cajaIng-cajaEg), c: C.green }, { l: 'Transacciones', v: cajaTx.length, c: C.text }].map((c,i) => (
                       <div key={i} style={{ ...card, padding: '12px' }}>
                         <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>{c.l}</div>
                         <div style={{ fontWeight: 700, fontSize: '1.1rem', marginTop: '4px', color: c.c }}>{c.v}</div>
@@ -1809,7 +1829,7 @@ function MobileApp() {
                           sec.data.map(([pm,amt]) => (
                             <div key={pm} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid rgba(37,37,53,.4)' }}>
                               <span style={{ fontSize: '14px', color: '#c0c0e0' }}>{pm}</span>
-                              <span style={{ fontWeight: 700, fontSize: '14px', color: sec.color }}>{fmt(amt)}</span>
+                              <span style={{ fontWeight: 700, fontSize: '14px', color: sec.color }}>{f(amt)}</span>
                             </div>
                           ))}
                       </div>
@@ -1834,7 +1854,7 @@ function MobileApp() {
 
               {rTab === 'resumen' && <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-                  {[{ l: 'Ingresos', v: fmtM(ing), c: C.purple }, { l: 'Egresos', v: fmtM(eg), c: C.red }, { l: 'Neto', v: fmtM(util), c: C.green }, { l: 'Margen', v: `${margin}%`, c: C.text }].map((k,i) => (
+                  {[{ l: 'Ingresos', v: fM(ing), c: C.purple }, { l: 'Egresos', v: fM(eg), c: C.red }, { l: 'Neto', v: fM(util), c: C.green }, { l: 'Margen', v: `${margin}%`, c: C.text }].map((k,i) => (
                     <div key={i} style={{ ...card, padding: '14px' }}>
                       <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>{k.l}</div>
                       <div style={{ fontWeight: 700, fontSize: '1.4rem', marginTop: '5px', color: k.c }}>{k.v}</div>
@@ -1854,7 +1874,7 @@ function MobileApp() {
                   <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>{MONTHS.map((_,i) => <div key={i} style={{ flex: 1, textAlign: 'center', fontSize: '7px', color: C.muted }}>{MONTHS[i].slice(0,1)}</div>)}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase' }}>Acum. ingresos</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: C.purple, marginTop: '4px' }}>{fmtM(totIng)}</div></div>
+                  <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase' }}>Acum. ingresos</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: C.purple, marginTop: '4px' }}>{fM(totIng)}</div></div>
                   <div style={{ ...card, padding: '14px' }}><div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase' }}>Mejor mes</div><div style={{ fontWeight: 700, fontSize: '1.1rem', color: C.green, marginTop: '4px' }}>{MONTHS[bestM].slice(0,3)}</div></div>
                 </div>
               </>}
@@ -1866,7 +1886,7 @@ function MobileApp() {
                 const total = isIng ? ing : eg
                 const color = isIng ? C.purple : C.red
                 return <>
-                  <div style={{ fontWeight: 700, fontSize: '28px', letterSpacing: '-.04em', marginBottom: '16px', color }}>{fmt(total)}</div>
+                  <div style={{ fontWeight: 700, fontSize: '28px', letterSpacing: '-.04em', marginBottom: '16px', color }}>{f(total)}</div>
                   <div style={{ ...card, padding: '16px', marginBottom: '14px' }}>
                     <div style={{ fontSize: '11px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '12px' }}>Por categoría</div>
                     <DonutChart items={catItems} total={total} size={120} />
@@ -1879,7 +1899,7 @@ function MobileApp() {
                           <span style={{ fontSize: '13px', flex: 1, color: '#c0c0e0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
                           <div style={{ width: '60px', height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '99px' }} /></div>
                           <span style={{ fontSize: '12px', color: C.muted, minWidth: '28px' }}>{pct}%</span>
-                          <span style={{ fontWeight: 700, fontSize: '13px', color, minWidth: '70px', textAlign: 'right' }}>{fmtM(it.amount)}</span>
+                          <span style={{ fontWeight: 700, fontSize: '13px', color, minWidth: '70px', textAlign: 'right' }}>{fM(it.amount)}</span>
                         </div>
                       )})}
                   </div>
@@ -1906,7 +1926,7 @@ function MobileApp() {
                             <div style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, background: isTop?rBarC:'#1a1a2e', color: isTop?'white':C.muted }}>{it.rank}</div>
                             <div style={{ fontSize: '13px', fontWeight: 500, flex: 1, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
                             <div style={{ width: '60px', height: '5px', background: '#1a1a2e', borderRadius: '99px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${bw}%`, background: isTop?rBarC:'#2a2a3e', borderRadius: '99px' }} /></div>
-                            <span style={{ fontWeight: 700, fontSize: '13px', color: isTop?rColor:C.muted, minWidth: '70px', textAlign: 'right' }}>{fmtM(it.amount)}</span>
+                            <span style={{ fontWeight: 700, fontSize: '13px', color: isTop?rColor:C.muted, minWidth: '70px', textAlign: 'right' }}>{fM(it.amount)}</span>
                           </div>
                         </div>
                       )
@@ -1950,7 +1970,7 @@ function MobileApp() {
                         {c.over && <span style={{ fontSize: '9px', padding: '2px 7px', borderRadius: '99px', background: 'rgba(248,113,113,.15)', color: C.red, fontWeight: 600 }}>🚨 Superado</span>}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fmtM(c.spent)} / {fmtM(c.limit)}</span>
+                        <span style={{ fontSize: '11px', color: c.over ? C.red : c.warning ? '#fbbf24' : C.muted }}>{fM(c.spent)} / {fM(c.limit)}</span>
                         <button onClick={() => c.budgetId && deleteBudget(c.budgetId)} style={{ width: '20px', height: '20px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>×</button>
                       </div>
                     </div>
@@ -2141,9 +2161,153 @@ export default function App() {
   )
 }
 
+function OnboardingPage({ onDone }: { onDone: (currency: string, space: string) => void }) {
+  const { user } = useAuth()
+  const [step, setStep] = useState(0)
+  const [currency, setCurrency] = useState('COP')
+  const [space, setSpace] = useState('personal')
+  const [selectedCats, setSelectedCats] = useState<string[]>(['Alimentación', 'Transporte', 'Salud'])
+  const [savingCats, setSavingCats] = useState(false)
+
+  const PRESET_CATS = [
+    { name: 'Alimentación', ic: '🛒', color: '#fb923c' },
+    { name: 'Transporte', ic: '🚗', color: '#60a5fa' },
+    { name: 'Salud', ic: '💊', color: '#f87171' },
+    { name: 'Entretenimiento', ic: '🎬', color: '#c084fc' },
+    { name: 'Educación', ic: '📚', color: '#4ade80' },
+    { name: 'Ropa', ic: '👕', color: '#fbbf24' },
+    { name: 'Vivienda', ic: '🏠', color: '#818cf8' },
+    { name: 'Mascotas', ic: '🐾', color: '#f472b6' },
+    { name: 'Viajes', ic: '✈️', color: '#2dd4bf' },
+    { name: 'Restaurantes', ic: '🍽️', color: '#fb923c' },
+    { name: 'Gym', ic: '💪', color: '#4ade80' },
+    { name: 'Suscripciones', ic: '📱', color: '#a89ef5' },
+    { name: 'Combustible', ic: '⛽', color: '#fbbf24' },
+    { name: 'Ahorro', ic: '💎', color: '#38bdf8' },
+    { name: 'Inversiones', ic: '📈', color: '#4ade80' },
+    { name: 'Otros', ic: '📦', color: '#6060a0' },
+  ]
+
+  const toggleCat = (name: string) => setSelectedCats(prev => prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name])
+
+  const steps = [
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '32px 24px', textAlign: 'center' }}>
+      <img src={LOGO} style={{ width: '100px', height: '100px', borderRadius: '26px', marginBottom: '28px', boxShadow: '0 0 40px rgba(139,127,240,.4)' }} alt="Fluxyy" />
+      <div style={{ fontSize: '32px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '12px' }}>Bienvenido a Fluxyy</div>
+      <div style={{ fontSize: '16px', color: C.muted, lineHeight: 1.6, maxWidth: '300px', marginBottom: '40px' }}>Tu copiloto financiero para tomar el control de tu dinero</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', maxWidth: '340px' }}>
+        {[{ ic: '📊', t: 'Registra tus movimientos', d: 'Ingresos y gastos en segundos' }, { ic: '💰', t: 'Controla tu presupuesto', d: 'Límites por categoría con alertas' }, { ic: '📈', t: 'Analiza tus finanzas', d: 'Reportes y gráficos en tiempo real' }].map((f, i) => (
+          <div key={i} style={{ ...card, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left' }}>
+            <div style={{ fontSize: '28px', flexShrink: 0 }}>{f.ic}</div>
+            <div><div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{f.t}</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>{f.d}</div></div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setStep(1)} style={{ ...btn, width: '100%', maxWidth: '340px', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '32px' }}>Comenzar →</button>
+    </div>,
+
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '80px 24px 40px' }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '8px' }}>¿Cuál es tu moneda?</div>
+      <div style={{ fontSize: '15px', color: C.muted, marginBottom: '32px' }}>Puedes cambiarla después en Ajustes</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+        {[{ code: 'COP', flag: '🇨🇴', name: 'Peso colombiano', sym: '$' }, { code: 'CLP', flag: '🇨🇱', name: 'Peso chileno', sym: '$' }, { code: 'MXN', flag: '🇲🇽', name: 'Peso mexicano', sym: '$' }, { code: 'PEN', flag: '🇵🇪', name: 'Sol peruano', sym: 'S/' }, { code: 'USD', flag: '🇺🇸', name: 'Dólar', sym: '$' }].map(c => (
+          <div key={c.code} onClick={() => setCurrency(c.code)} style={{ ...card, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: currency === c.code ? `2px solid ${C.primary}` : `1px solid ${C.border}`, background: currency === c.code ? C.primaryLight : C.card, transition: 'all .15s' }}>
+            <div style={{ fontSize: '28px' }}>{c.flag}</div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: '15px', fontWeight: 600, color: C.text }}>{c.name}</div><div style={{ fontSize: '12px', color: C.muted, marginTop: '2px' }}>{c.code} · {c.sym}</div></div>
+            {currency === c.code && <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setStep(2)} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '24px' }}>Siguiente →</button>
+    </div>,
+
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '80px 24px 40px' }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '8px' }}>Elige tus categorías</div>
+      <div style={{ fontSize: '15px', color: C.muted, marginBottom: '20px' }}>Toca las que usas — puedes agregar más después</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', flex: 1, overflowY: 'auto', paddingBottom: '8px' }}>
+        {PRESET_CATS.map(c => {
+          const selected = selectedCats.includes(c.name)
+          return (
+            <div key={c.name} onClick={() => toggleCat(c.name)} style={{ background: selected ? `${c.color}22` : C.card, border: `2px solid ${selected ? c.color : C.border}`, borderRadius: '14px', padding: '14px 8px', cursor: 'pointer', textAlign: 'center', transition: 'all .15s', position: 'relative' }}>
+              {selected && <div style={{ position: 'absolute', top: '6px', right: '6px', width: '16px', height: '16px', borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+              <div style={{ fontSize: '28px', marginBottom: '6px' }}>{c.ic}</div>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: selected ? C.text : C.muted }}>{c.name}</div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ fontSize: '12px', color: C.muted, textAlign: 'center', margin: '10px 0 4px' }}>{selectedCats.length} categorías seleccionadas</div>
+      <button onClick={async () => {
+        if (!user || savingCats) return
+        setSavingCats(true)
+        const inserts = selectedCats.map(name => {
+          const cat = PRESET_CATS.find(c => c.name === name)
+          return { user_id: user.id, space: 'personal', type: 'egreso', name, color: cat?.color || '#6060a0', is_default: false }
+        })
+        inserts.push({ user_id: user.id, space: 'personal', type: 'ingreso', name: 'Ingresos', color: '#a89ef5', is_default: true })
+        await supabase.from('categories').upsert(inserts, { onConflict: 'user_id,space,name' })
+        setSavingCats(false)
+        setStep(3)
+      }} disabled={savingCats || selectedCats.length === 0} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '8px', opacity: (savingCats || selectedCats.length === 0) ? 0.6 : 1 }}>
+        {savingCats ? 'Guardando...' : 'Siguiente →'}
+      </button>
+    </div>,
+
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '80px 24px 40px' }}>
+      <div style={{ fontSize: '28px', fontWeight: 800, color: C.text, letterSpacing: '-.03em', marginBottom: '8px' }}>¿Para qué lo usarás?</div>
+      <div style={{ fontSize: '15px', color: C.muted, marginBottom: '32px' }}>Puedes usar ambos espacios en cualquier momento</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1 }}>
+        {[{ id: 'personal', ic: '👤', t: 'Personal', d: 'Controla tus gastos e ingresos personales', color: '#8b7ff0' }, { id: 'empresa', ic: '🏢', t: 'Negocio', d: 'Gestiona las finanzas de tu empresa o emprendimiento', color: '#4ade80' }, { id: 'ambos', ic: '⚡', t: 'Ambos', d: 'Lleva finanzas personales y de negocio por separado', color: '#fbbf24' }].map(s => (
+          <div key={s.id} onClick={() => setSpace(s.id)} style={{ ...card, padding: '20px', cursor: 'pointer', border: space === s.id ? `2px solid ${s.color}` : `1px solid ${C.border}`, background: space === s.id ? `${s.color}18` : C.card, transition: 'all .15s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{ fontSize: '28px' }}>{s.ic}</div>
+              <div style={{ fontSize: '17px', fontWeight: 700, color: C.text }}>{s.t}</div>
+              {space === s.id && <div style={{ marginLeft: 'auto', width: '22px', height: '22px', borderRadius: '50%', background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg></div>}
+            </div>
+            <div style={{ fontSize: '13px', color: C.muted, lineHeight: 1.5 }}>{s.d}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => onDone(currency, space)} style={{ ...btn, width: '100%', padding: '16px', fontSize: '16px', borderRadius: '14px', marginTop: '24px' }}>¡Empezar! 🚀</button>
+    </div>
+  ]
+
+  return (
+    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: "'DM Sans', sans-serif", colorScheme: 'dark', maxWidth: '500px', margin: '0 auto' }}>
+      {step > 0 && (
+        <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '500px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 10, background: C.bg }}>
+          <button onClick={() => setStep(s => s - 1)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '22px', padding: '0' }}>←</button>
+          <div style={{ flex: 1, display: 'flex', gap: '6px' }}>
+            {[1,2,3].map(i => <div key={i} style={{ flex: 1, height: '3px', borderRadius: '99px', background: i <= step ? C.primary : C.border, transition: 'background .3s' }} />)}
+          </div>
+          <div style={{ fontSize: '12px', color: C.muted }}>{step}/3</div>
+        </div>
+      )}
+      {steps[step]}
+    </div>
+  )
+}
+
 function AppRoot() {
   const { user, loading } = useAuth()
   const [view, setView] = useState<'login' | 'register'>('login')
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      const done = localStorage.getItem(`onboarding_${user.id}`)
+      if (!done) setShowOnboarding(true)
+    }
+  }, [user])
+
+  const finishOnboarding = async (currency: string, space: string) => {
+    if (user) {
+      await supabase.from('profiles').update({ currency }).eq('id', user.id)
+      localStorage.setItem(`onboarding_${user.id}`, 'done')
+    }
+    setShowOnboarding(false)
+  }
+
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Sans', sans-serif" }}>
       <div style={{ textAlign: 'center' }}>
@@ -2155,5 +2319,6 @@ function AppRoot() {
   if (!user) return view === 'register'
     ? <RegisterPage onLogin={() => setView('login')} />
     : <LoginPage onReg={() => setView('register')} />
+  if (showOnboarding) return <OnboardingPage onDone={finishOnboarding} />
   return <MainApp />
 }
