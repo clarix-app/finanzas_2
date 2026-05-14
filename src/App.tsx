@@ -1191,7 +1191,7 @@ function MainApp() {
                           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
                           <span style={{ fontSize: '11px', flex: 1, color: '#c0c0e0' }}>{c.name}</span>
                           <span style={{ fontSize: '9px', color: C.muted, background: '#1a1a2e', padding: '2px 6px', borderRadius: '99px' }}>{c.type}</span>
-                          {!c.is_default && <button onClick={() => delCat(c.id)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px' }}>×</button>}
+                          <button onClick={() => delCat(c.id)} style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '14px' }}>×</button>
                         </div>
                       ))}
                     </div>
@@ -2081,7 +2081,7 @@ function MobileApp() {
                           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.color, flexShrink: 0 }} />
                           <span style={{ fontSize: '14px', flex: 1, color: '#c0c0e0' }}>{c.name}</span>
                           <span style={{ fontSize: '10px', color: C.muted, background: '#1a1a2e', padding: '3px 8px', borderRadius: '99px' }}>{c.type}</span>
-                          {!c.is_default && <button onClick={() => delCat(c.id)} style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>×</button>}
+                          <button onClick={() => delCat(c.id)} style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'transparent', border: 'none', color: C.muted, cursor: 'pointer', fontSize: '16px' }}>×</button>
                         </div>
                       ))}
                     </div>
