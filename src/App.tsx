@@ -480,7 +480,8 @@ function AdminPage() {
 
   async function loadUsers() {
     setLoading(true)
-    const { data } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    const { data, error } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    if (error) console.error('loadUsers error:', error)
     const { data: movs } = await supabase.from('transactions').select('user_id')
     if (data) {
       const usersWithMovs = data.map((u: any) => ({
@@ -1374,7 +1375,8 @@ function MobileAdminPage() {
 
   async function loadUsers() {
     setLoading(true)
-    const { data } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    const { data, error } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    if (error) console.error('loadUsers error:', error)
     const { data: movs } = await supabase.from('transactions').select('user_id')
     if (data) {
       const usersWithMovs = data.map((u: any) => ({
