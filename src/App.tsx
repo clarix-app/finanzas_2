@@ -668,7 +668,15 @@ function MainApp() {
     if (p.data) setPms(p.data)
     if (g.data) setGami(g.data)
     if (b.data) setBudgets(b.data)
-    if (pr.data) { setProfile(pr.data); setCurrency(pr.data.currency || 'COP') }
+    if (pr.data) {
+      // Check if plan expired
+      let profileData = pr.data
+      if (profileData.plan_expires_at && new Date(profileData.plan_expires_at) < new Date() && profileData.plan !== 'free') {
+        await supabase.from('profiles').update({ plan: 'free', plan_expires_at: null }).eq('id', user!.id)
+        profileData = { ...profileData, plan: 'free', plan_expires_at: null }
+      }
+      setProfile(profileData); setCurrency(profileData.currency || 'COP')
+    }
     setLoading(false)
   }
 
@@ -1533,7 +1541,15 @@ function MobileApp() {
       supabase.from('profiles').select('*').eq('id', user!.id).single(),
     ])
     if (t.data) setTxs(t.data); if (c.data) setCats(c.data); if (p.data) setPms(p.data)
-    if (g.data) setGami(g.data); if (b.data) setBudgets(b.data); if (pr.data) { setProfile(pr.data); setCurrency(pr.data.currency || 'COP') }
+    if (g.data) setGami(g.data); if (b.data) setBudgets(b.data)
+    if (pr.data) {
+      let profileData = pr.data
+      if (profileData.plan_expires_at && new Date(profileData.plan_expires_at) < new Date() && profileData.plan !== 'free') {
+        await supabase.from('profiles').update({ plan: 'free', plan_expires_at: null }).eq('id', user!.id)
+        profileData = { ...profileData, plan: 'free', plan_expires_at: null }
+      }
+      setProfile(profileData); setCurrency(profileData.currency || 'COP')
+    }
     setLoading(false)
   }
 
