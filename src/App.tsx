@@ -486,8 +486,23 @@ function AdminPage() {
     if (userId === ADMIN_EMAIL) return
     const newPlan = currentPlan === 'pro' ? 'free' : 'pro'
     setUpdating(userId)
-    await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    const { error } = await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
+    if (!error) setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    else console.error('togglePlan error:', error)
+    setUpdating(null)
+  }
+
+  async function deleteUser(userId: string, userEmail: string) {
+    if (userEmail === ADMIN_EMAIL) return
+    if (!confirm(`¿Eliminar usuario ${userEmail}? Esta acción no se puede deshacer.`)) return
+    setUpdating(userId)
+    await supabase.from('transactions').delete().eq('user_id', userId)
+    await supabase.from('categories').delete().eq('user_id', userId)
+    await supabase.from('budgets').delete().eq('user_id', userId)
+    await supabase.from('payment_methods').delete().eq('user_id', userId)
+    await supabase.from('gamification').delete().eq('user_id', userId)
+    await supabase.from('profiles').delete().eq('id', userId)
+    setUsers(prev => prev.filter(u => u.id !== userId))
     setUpdating(null)
   }
 
@@ -543,18 +558,21 @@ function AdminPage() {
             <div style={{ fontSize: '10px', color: C.muted }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</div>
             <div style={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>{u.total_movimientos || 0}</div>
             <div style={{ fontSize: '10px', color: C.muted }}>{u.ultimo_movimiento ? new Date(u.ultimo_movimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
               <button
                 onClick={() => togglePlan(u.id, u.plan)}
                 disabled={updating === u.id || u.email === ADMIN_EMAIL}
                 style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1 }}>
                 {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
               </button>
+              {u.email !== ADMIN_EMAIL && (
+                <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id} style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
+              )}
             </div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: '10px', color: C.muted, marginTop: '8px', textAlign: 'center' }}>Clic en el badge para cambiar Free ↔ Pro</div>
+      <div style={{ fontSize: '10px', color: C.muted, marginTop: '8px', textAlign: 'center' }}>Clic en el badge para cambiar Free ↔ Pro · × para eliminar usuario</div>
     </div>
   )
 }
@@ -1301,8 +1319,22 @@ function MobileAdminPage() {
     if (email === ADMIN_EMAIL) return
     const newPlan = currentPlan === 'pro' ? 'free' : 'pro'
     setUpdating(userId)
-    await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    const { error } = await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
+    if (!error) setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    setUpdating(null)
+  }
+
+  async function deleteUser(userId: string, userEmail: string) {
+    if (userEmail === ADMIN_EMAIL) return
+    if (!confirm(`¿Eliminar usuario ${userEmail}?`)) return
+    setUpdating(userId)
+    await supabase.from('transactions').delete().eq('user_id', userId)
+    await supabase.from('categories').delete().eq('user_id', userId)
+    await supabase.from('budgets').delete().eq('user_id', userId)
+    await supabase.from('payment_methods').delete().eq('user_id', userId)
+    await supabase.from('gamification').delete().eq('user_id', userId)
+    await supabase.from('profiles').delete().eq('id', userId)
+    setUsers(prev => prev.filter(u => u.id !== userId))
     setUpdating(null)
   }
 
@@ -1337,9 +1369,14 @@ function MobileAdminPage() {
                   <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
                   <div style={{ fontSize: '11px', color: C.sub, marginTop: '3px' }}>{u.total_movimientos || 0} movs · {u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</div>
                 </div>
-                <button onClick={() => togglePlan(u.id, u.email, u.plan)} disabled={updating === u.id || u.email === ADMIN_EMAIL} style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1, flexShrink: 0, marginLeft: '12px' }}>
-                  {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
-                </button>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}>
+                  <button onClick={() => togglePlan(u.id, u.email, u.plan)} disabled={updating === u.id || u.email === ADMIN_EMAIL} style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1 }}>
+                    {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
+                  </button>
+                  {u.email !== ADMIN_EMAIL && (
+                    <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
