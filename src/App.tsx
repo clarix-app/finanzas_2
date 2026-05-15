@@ -536,8 +536,8 @@ function AdminPage() {
         <button onClick={loadUsers} style={{ ...btn, fontSize: '11px', padding: '6px 12px' }}>↻ Actualizar</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '9px', marginBottom: '16px' }}>
-        {[{ l: 'Total usuarios', v: users.length, c: C.text, ic: '👥' }, { l: 'Usuarios Pro', v: totalPro, c: C.green, ic: '⚡' }, { l: 'Usuarios Free', v: totalFree, c: C.muted, ic: '🔒' }].map((k, i) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '9px', marginBottom: '16px' }}>
+        {[{ l: 'Total', v: users.length, c: C.text, ic: '👥' }, { l: 'Free', v: totalFree, c: C.muted, ic: '🔒' }, { l: '1 Espacio', v: users.filter(u=>u.plan==='pro').length, c: C.primary, ic: '⚡' }, { l: '2 Espacios', v: users.filter(u=>u.plan==='pro_full').length, c: C.green, ic: '🚀' }].map((k, i) => (
           <div key={i} style={{ ...card, padding: '14px 16px' }}>
             <div style={{ fontSize: '18px', marginBottom: '6px' }}>{k.ic}</div>
             <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.1em' }}>{k.l}</div>
