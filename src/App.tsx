@@ -834,7 +834,7 @@ function MainApp() {
     { id: 'reportes', l: 'Reportes', d: 'M18 20V10M12 20V4M6 20v-6' },
   ]
   const isAdmin = user?.email === ADMIN_EMAIL
-  const isPro = profile?.plan === 'pro'
+  const isPro = profile?.plan === 'pro' || profile?.plan === 'pro_full'
   const f = (n: number) => fmt(n, currency)
   const fM = (n: number) => fmtM(n, currency)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -1521,7 +1521,7 @@ function MobileApp() {
   const [movFilter, setMovFilter] = useState(''); const [cajaF, setCajaF] = useState('hoy'); const [movView, setMovView] = useState('lista')
 
   const isAdmin = user?.email === ADMIN_EMAIL
-  const isPro = profile?.plan === 'pro'
+  const isPro = profile?.plan === 'pro' || profile?.plan === 'pro_full'
   const [currency, setCurrency] = useState('COP')
   const f = (n: number) => fmt(n, currency)
   const fM = (n: number) => fmtM(n, currency)
