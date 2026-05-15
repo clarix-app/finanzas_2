@@ -16,7 +16,7 @@ interface PM { id: string; user_id: string; name: string; is_default: boolean }
 interface Gami { user_id: string; xp: number; level: number; streak_days: number }
 interface Budget { id: string; user_id: string; space: Space; category_name: string; limit_amount: number }
 interface Profile { id: string; name: string; email: string; plan: string; currency: string }
-interface AdminUser { id: string; email: string; name: string; plan: string; created_at: string; total_movimientos: number; ultimo_movimiento: string | null }
+interface AdminUser { id: string; email: string; name: string; plan: string; plan_expires_at?: string | null; created_at: string; total_movimientos: number; ultimo_movimiento: string | null }
 
 const ADMIN_EMAIL = 'fpadillav1@gmail.com'
 
@@ -472,23 +472,35 @@ function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [updating, setUpdating] = useState<string | null>(null)
+  const [editingUser, setEditingUser] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState('pro')
+  const [selectedDays, setSelectedDays] = useState(30)
 
   useEffect(() => { loadUsers() }, [])
 
   async function loadUsers() {
     setLoading(true)
-    const { data } = await supabase.from('admin_users').select('*')
-    if (data) setUsers(data)
+    const { data } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    const { data: movs } = await supabase.from('transactions').select('user_id')
+    if (data) {
+      const usersWithMovs = data.map((u: any) => ({
+        ...u,
+        total_movimientos: movs?.filter((m: any) => m.user_id === u.id).length || 0
+      }))
+      setUsers(usersWithMovs)
+    }
     setLoading(false)
   }
 
-  async function togglePlan(userId: string, currentPlan: string) {
-    if (userId === ADMIN_EMAIL) return
-    const newPlan = currentPlan === 'pro' ? 'free' : 'pro'
+  async function updatePlan(userId: string, userEmail: string) {
+    if (userEmail === ADMIN_EMAIL) return
     setUpdating(userId)
-    const { error } = await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
-    if (!error) setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
-    else console.error('togglePlan error:', error)
+    const expires = selectedPlan === 'free' ? null : new Date(Date.now() + selectedDays * 24 * 60 * 60 * 1000).toISOString()
+    const { error } = await supabase.from('profiles').update({ plan: selectedPlan, plan_expires_at: expires }).eq('id', userId)
+    if (!error) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: selectedPlan, plan_expires_at: expires } : u))
+      setEditingUser(null)
+    }
     setUpdating(null)
   }
 
@@ -542,37 +554,72 @@ function AdminPage() {
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por email o nombre..." style={{ ...inp, marginBottom: '12px' }} />
 
       <div style={{ ...card, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px 60px 100px 80px', padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>
-          <span>Usuario</span><span>Registro</span><span>Movs.</span><span>Último mov.</span><span style={{ textAlign: 'right' }}>Plan</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 50px 160px 30px', padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          <span>Usuario</span><span>Registro</span><span>Movs.</span><span style={{ textAlign: 'center' }}>Plan</span><span></span>
         </div>
         {loading ? (
           <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>Cargando usuarios...</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: C.muted, fontSize: '12px' }}>No se encontraron usuarios</div>
         ) : filtered.map(u => (
-          <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 60px 100px 80px', padding: '10px 14px', borderBottom: '1px solid rgba(37,37,53,.5)', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: '12px', fontWeight: 500, color: C.text }}>{u.name || '—'} {u.email === ADMIN_EMAIL ? '👑' : ''}</div>
-              <div style={{ fontSize: '10px', color: C.muted, marginTop: '1px' }}>{u.email}</div>
+          <div key={u.id}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 90px 50px 160px 30px', padding: '10px 14px', borderBottom: editingUser === u.id ? 'none' : '1px solid rgba(37,37,53,.5)', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 500, color: C.text }}>{u.name || '—'} {u.email === ADMIN_EMAIL ? '👑' : ''}</div>
+                <div style={{ fontSize: '10px', color: C.muted, marginTop: '1px' }}>{u.email}</div>
+              </div>
+              <div style={{ fontSize: '10px', color: C.muted }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</div>
+              <div style={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>{u.total_movimientos || 0}</div>
+              <div style={{ textAlign: 'center' }}>
+                {u.email === ADMIN_EMAIL ? (
+                  <span style={{ fontSize: '10px', color: '#fbbf24', fontWeight: 700 }}>👑 Admin</span>
+                ) : (
+                  <button onClick={() => { setEditingUser(editingUser === u.id ? null : u.id); setSelectedPlan(u.plan || 'free'); setSelectedDays(30) }}
+                    style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                      background: u.plan === 'pro_full' ? 'rgba(74,222,128,.15)' : u.plan === 'pro' ? 'rgba(139,127,240,.15)' : 'rgba(96,96,160,.15)',
+                      color: u.plan === 'pro_full' ? C.green : u.plan === 'pro' ? C.primary : C.muted }}>
+                    {u.plan === 'pro_full' ? '⚡ 2 espacios' : u.plan === 'pro' ? '⚡ 1 espacio' : '🔒 Free'}
+                    {u.plan_expires_at && u.plan !== 'free' ? ` · ${Math.max(0, Math.ceil((new Date(u.plan_expires_at).getTime() - Date.now()) / 86400000))}d` : ''}
+                  </button>
+                )}
+              </div>
+              <div>
+                {u.email !== ADMIN_EMAIL && (
+                  <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id}
+                    style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: '10px', color: C.muted }}>{u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</div>
-            <div style={{ fontSize: '12px', color: C.text, fontWeight: 600 }}>{u.total_movimientos || 0}</div>
-            <div style={{ fontSize: '10px', color: C.muted }}>{u.ultimo_movimiento ? new Date(u.ultimo_movimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</div>
-            <div style={{ textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-              <button
-                onClick={() => togglePlan(u.id, u.plan)}
-                disabled={updating === u.id || u.email === ADMIN_EMAIL}
-                style={{ padding: '4px 10px', borderRadius: '99px', fontSize: '10px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1 }}>
-                {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
-              </button>
-              {u.email !== ADMIN_EMAIL && (
-                <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id} style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
-              )}
-            </div>
+            {editingUser === u.id && (
+              <div style={{ background: '#0f0f1a', padding: '12px 14px', borderBottom: '1px solid rgba(37,37,53,.5)', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '11px', color: C.muted, marginRight: '4px' }}>Plan:</div>
+                <select value={selectedPlan} onChange={e => setSelectedPlan(e.target.value)} style={{ ...sel, width: 'auto', fontSize: '11px', padding: '4px 8px' }}>
+                  <option value="free">🔒 Free</option>
+                  <option value="pro">⚡ 1 Espacio — $2.99/mes</option>
+                  <option value="pro_full">⚡ 2 Espacios — $4.99/mes</option>
+                </select>
+                {selectedPlan !== 'free' && <>
+                  <div style={{ fontSize: '11px', color: C.muted }}>Duración:</div>
+                  <select value={selectedDays} onChange={e => setSelectedDays(Number(e.target.value))} style={{ ...sel, width: 'auto', fontSize: '11px', padding: '4px 8px' }}>
+                    <option value={30}>30 días (1 mes)</option>
+                    <option value={60}>60 días (2 meses)</option>
+                    <option value={90}>90 días (3 meses)</option>
+                    <option value={120}>120 días (4 meses)</option>
+                    <option value={150}>150 días (5 meses)</option>
+                    <option value={180}>180 días (6 meses)</option>
+                  </select>
+                </>}
+                <button onClick={() => updatePlan(u.id, u.email)} disabled={updating === u.id}
+                  style={{ ...btn, fontSize: '11px', padding: '5px 12px', opacity: updating === u.id ? 0.6 : 1 }}>
+                  {updating === u.id ? 'Guardando...' : 'Guardar'}
+                </button>
+                <button onClick={() => setEditingUser(null)} style={{ fontSize: '11px', padding: '5px 10px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '7px', color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
-      <div style={{ fontSize: '10px', color: C.muted, marginTop: '8px', textAlign: 'center' }}>Clic en el badge para cambiar Free ↔ Pro · × para eliminar usuario</div>
+      <div style={{ fontSize: '10px', color: C.muted, marginTop: '8px', textAlign: 'center' }}>Clic en el plan para editarlo · × para eliminar usuario</div>
     </div>
   )
 }
@@ -1305,22 +1352,35 @@ function MobileAdminPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [updating, setUpdating] = useState<string | null>(null)
+  const [editingUser, setEditingUser] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState('pro')
+  const [selectedDays, setSelectedDays] = useState(30)
 
   useEffect(() => { loadUsers() }, [])
 
   async function loadUsers() {
     setLoading(true)
-    const { data } = await supabase.from('admin_users').select('*')
-    if (data) setUsers(data)
+    const { data } = await supabase.from('profiles').select('id, email, name, plan, plan_expires_at, created_at')
+    const { data: movs } = await supabase.from('transactions').select('user_id')
+    if (data) {
+      const usersWithMovs = data.map((u: any) => ({
+        ...u,
+        total_movimientos: movs?.filter((m: any) => m.user_id === u.id).length || 0
+      }))
+      setUsers(usersWithMovs)
+    }
     setLoading(false)
   }
 
-  async function togglePlan(userId: string, email: string, currentPlan: string) {
-    if (email === ADMIN_EMAIL) return
-    const newPlan = currentPlan === 'pro' ? 'free' : 'pro'
+  async function updatePlan(userId: string, userEmail: string) {
+    if (userEmail === ADMIN_EMAIL) return
     setUpdating(userId)
-    const { error } = await supabase.from('profiles').update({ plan: newPlan }).eq('id', userId)
-    if (!error) setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: newPlan } : u))
+    const expires = selectedPlan === 'free' ? null : new Date(Date.now() + selectedDays * 24 * 60 * 60 * 1000).toISOString()
+    const { error } = await supabase.from('profiles').update({ plan: selectedPlan, plan_expires_at: expires }).eq('id', userId)
+    if (!error) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan: selectedPlan, plan_expires_at: expires } : u))
+      setEditingUser(null)
+    }
     setUpdating(null)
   }
 
@@ -1339,7 +1399,7 @@ function MobileAdminPage() {
   }
 
   const filtered = users.filter(u => u.email?.toLowerCase().includes(search.toLowerCase()) || u.name?.toLowerCase().includes(search.toLowerCase()))
-  const totalPro = users.filter(u => u.plan === 'pro').length
+  const totalPro = users.filter(u => u.plan === 'pro' || u.plan === 'pro_full').length
 
   return (
     <div style={{ padding: '16px', paddingBottom: '100px' }}>
@@ -1347,7 +1407,7 @@ function MobileAdminPage() {
       <div style={{ fontSize: '12px', color: C.sub, marginBottom: '16px' }}>Gestión de usuarios</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '14px' }}>
-        {[{ l: 'Total', v: users.length, c: C.text }, { l: 'Pro', v: totalPro, c: C.green }, { l: 'MRR', v: `$${totalPro * 5}`, c: C.purple }].map((k, i) => (
+        {[{ l: 'Total', v: users.length, c: C.text }, { l: 'Pro', v: totalPro, c: C.green }, { l: 'MRR est.', v: `$${totalPro * 3}+`, c: C.purple }].map((k, i) => (
           <div key={i} style={{ ...card, padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '10px', color: C.muted, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '4px' }}>{k.l}</div>
             <div style={{ fontWeight: 700, fontSize: '1.4rem', color: k.c }}>{k.v}</div>
@@ -1360,24 +1420,63 @@ function MobileAdminPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {loading ? <div style={{ textAlign: 'center', color: C.muted, padding: '24px', fontSize: '14px' }}>Cargando...</div> :
           filtered.map(u => (
-            <div key={u.id} style={{ ...card, padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div key={u.id} style={{ ...card, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: C.text, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {u.name || '—'} {u.email === ADMIN_EMAIL ? '👑' : ''}
-                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: C.text }}>{u.name || '—'} {u.email === ADMIN_EMAIL ? '👑' : ''}</div>
                   <div style={{ fontSize: '11px', color: C.muted, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
-                  <div style={{ fontSize: '11px', color: C.sub, marginTop: '3px' }}>{u.total_movimientos || 0} movs · {u.created_at ? new Date(u.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</div>
+                  <div style={{ fontSize: '11px', color: C.sub, marginTop: '3px' }}>
+                    {u.total_movimientos || 0} movs
+                    {u.plan_expires_at && u.plan !== 'free' ? ` · vence ${new Date(u.plan_expires_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}` : ''}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0, marginLeft: '12px' }}>
-                  <button onClick={() => togglePlan(u.id, u.email, u.plan)} disabled={updating === u.id || u.email === ADMIN_EMAIL} style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: 700, cursor: u.email === ADMIN_EMAIL ? 'default' : 'pointer', border: 'none', fontFamily: 'inherit', background: u.plan === 'pro' ? 'rgba(74,222,128,.15)' : 'rgba(96,96,160,.15)', color: u.plan === 'pro' ? C.green : C.muted, opacity: updating === u.id ? 0.5 : 1 }}>
-                    {updating === u.id ? '...' : u.plan === 'pro' ? '⚡ Pro' : '🔒 Free'}
-                  </button>
                   {u.email !== ADMIN_EMAIL && (
-                    <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id} style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    <button onClick={() => { setEditingUser(editingUser === u.id ? null : u.id); setSelectedPlan(u.plan || 'free'); setSelectedDays(30) }}
+                      style={{ padding: '6px 12px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+                        background: u.plan === 'pro_full' ? 'rgba(74,222,128,.15)' : u.plan === 'pro' ? 'rgba(139,127,240,.15)' : 'rgba(96,96,160,.15)',
+                        color: u.plan === 'pro_full' ? C.green : u.plan === 'pro' ? C.primary : C.muted }}>
+                      {u.plan === 'pro_full' ? '⚡ 2 esp.' : u.plan === 'pro' ? '⚡ 1 esp.' : '🔒 Free'}
+                    </button>
+                  )}
+                  {u.email !== ADMIN_EMAIL && (
+                    <button onClick={() => deleteUser(u.id, u.email)} disabled={updating === u.id}
+                      style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: C.red, cursor: 'pointer', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   )}
                 </div>
               </div>
+              {editingUser === u.id && (
+                <div style={{ background: '#0f0f1a', padding: '12px 16px', borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: '11px', color: C.muted, marginBottom: '8px', fontWeight: 600 }}>Editar plan de {u.name || u.email}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <select value={selectedPlan} onChange={e => setSelectedPlan(e.target.value)} style={{ ...sel, fontSize: '13px', padding: '8px 10px', width: '100%' }}>
+                      <option value="free">🔒 Free</option>
+                      <option value="pro">⚡ 1 Espacio — $2.99/mes</option>
+                      <option value="pro_full">⚡ 2 Espacios — $4.99/mes</option>
+                    </select>
+                    {selectedPlan !== 'free' && (
+                      <select value={selectedDays} onChange={e => setSelectedDays(Number(e.target.value))} style={{ ...sel, fontSize: '13px', padding: '8px 10px', width: '100%' }}>
+                        <option value={30}>30 días — 1 mes</option>
+                        <option value={60}>60 días — 2 meses</option>
+                        <option value={90}>90 días — 3 meses</option>
+                        <option value={120}>120 días — 4 meses</option>
+                        <option value={150}>150 días — 5 meses</option>
+                        <option value={180}>180 días — 6 meses</option>
+                      </select>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button onClick={() => updatePlan(u.id, u.email)} disabled={updating === u.id}
+                        style={{ ...btn, flex: 1, padding: '10px', fontSize: '13px', opacity: updating === u.id ? 0.6 : 1 }}>
+                        {updating === u.id ? 'Guardando...' : 'Guardar'}
+                      </button>
+                      <button onClick={() => setEditingUser(null)}
+                        style={{ flex: 1, padding: '10px', background: 'transparent', border: `1px solid ${C.border}`, borderRadius: '9px', color: C.muted, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
       </div>
