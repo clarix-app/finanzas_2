@@ -653,6 +653,12 @@ function MainApp() {
 
   useEffect(() => { if (user) loadAll() }, [user, space])
 
+  useEffect(() => {
+    const onFocus = () => { if (user) loadAll() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [user, space])
+
   async function loadAll() {
     setLoading(true)
     const [t, c, p, g, b, pr] = await Promise.all([
@@ -1529,6 +1535,12 @@ function MobileApp() {
   }, [])
 
   useEffect(() => { if (user) loadAll() }, [user, space])
+
+  useEffect(() => {
+    const onFocus = () => { if (user) loadAll() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [user, space])
 
   async function loadAll() {
     setLoading(true)
