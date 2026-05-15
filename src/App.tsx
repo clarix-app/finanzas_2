@@ -523,8 +523,8 @@ function AdminPage() {
     u.email?.toLowerCase().includes(search.toLowerCase()) ||
     u.name?.toLowerCase().includes(search.toLowerCase())
   )
-  const totalPro = users.filter(u => u.plan === 'pro').length
-  const totalFree = users.filter(u => u.plan !== 'pro').length
+  const totalPro = users.filter(u => u.plan === 'pro' || u.plan === 'pro_full').length
+  const totalFree = users.filter(u => u.plan !== 'pro' && u.plan !== 'pro_full').length
 
   return (
     <div style={{ padding: '20px' }}>
@@ -548,8 +548,8 @@ function AdminPage() {
 
       <div style={{ ...card, padding: '14px 16px', marginBottom: '16px', background: 'linear-gradient(135deg,rgba(139,127,240,.15),rgba(106,138,240,.08))', border: '1px solid rgba(139,127,240,.3)' }}>
         <div style={{ fontSize: '10px', color: C.primary, textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: '4px' }}>💰 MRR Estimado</div>
-        <div style={{ fontWeight: 700, fontSize: '2rem', color: C.text, letterSpacing: '-.04em' }}>${(totalPro * 5).toLocaleString()} <span style={{ fontSize: '14px', color: C.muted, fontWeight: 400 }}>USD/mes</span></div>
-        <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{totalPro} usuarios Pro × $5 USD</div>
+        <div style={{ fontWeight: 700, fontSize: '2rem', color: C.text, letterSpacing: '-.04em' }}>${(users.filter(u=>u.plan==='pro').length * 2.99 + users.filter(u=>u.plan==='pro_full').length * 4.99).toFixed(2)} <span style={{ fontSize: '14px', color: C.muted, fontWeight: 400 }}>USD/mes</span></div>
+        <div style={{ fontSize: '11px', color: C.muted, marginTop: '3px' }}>{users.filter(u=>u.plan==='pro').length} × $2.99 + {users.filter(u=>u.plan==='pro_full').length} × $4.99</div>
       </div>
 
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por email o nombre..." style={{ ...inp, marginBottom: '12px' }} />
